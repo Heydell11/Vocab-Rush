@@ -54,6 +54,7 @@
     <button class="btn btn-dark" id="btn-show-titles">🏅 称号</button>
     <button class="btn btn-dark" id="btn-show-rewards">🎁 リワード</button>
     <button class="btn btn-dark" id="btn-show-rank">🎖 ランク</button>
+    <button class="btn btn-dark" id="btn-show-mistakes">📝 苦手単語</button>
     <button class="btn btn-dark" id="btn-admin-login">管理者</button>
   </div>
 
@@ -184,6 +185,14 @@
     <p id="rank-confirmed-name" style="font-size:16px;"></p>
     <div id="rank-tier-list" style="margin-top:12px;"></div>
     <button class="btn btn-dark" id="btn-rank-back" style="margin-top:16px;">戻る</button>
+  </div>
+
+  <!-- MISTAKES -->
+  <div id="screen-mistakes" class="card hidden">
+    <h2 class="center" style="margin-top:0;">📝 苦手単語</h2>
+    <p style="font-size:12px; color:#94a3b8;">間違えた単語が自動で記録されます。覚えたら「克服」をタップしてください。</p>
+    <div id="mistakes-list" style="max-height:400px; overflow-y:auto;"></div>
+    <button class="btn btn-dark" id="btn-mistakes-back" style="margin-top:16px;">戻る</button>
   </div>
 
   <!-- ADMIN LOGIN -->
@@ -387,6 +396,7 @@ function ensureStats(profile) {
   if (!profile.bestRankKeyThisMonth) profile.bestRankKeyThisMonth = null;
   if (!profile.rankAchievementCounts) profile.rankAchievementCounts = {};
   if (!profile.displayedRankKey) profile.displayedRankKey = null;
+  if (!profile.mistakes) profile.mistakes = [];
   return profile.stats;
 }
 
@@ -429,7 +439,7 @@ var TITLES = [
   { id:'doryokuka', name:'努力家', category:'特殊', desc:'練習モード10回(未実装)', implemented:false, check:function(){ return false; } },
   { id:'tanren', name:'鍛錬の達人', category:'特殊', desc:'練習モード50回(未実装)', implemented:false, check:function(){ return false; } },
   { id:'jakutenKokufuku', name:'弱点克服者', category:'特殊', desc:'練習で累計100問正解(未実装)', implemented:false, check:function(){ return false; } },
-  { id:'revenger', name:'リベンジャー', category:'特殊', desc:'苦手単語20個克服(未実装)', implemented:false, check:function(){ return false; } },
+  { id:'revenger', name:'リベンジャー', category:'特殊', desc:'苦手単語20個克服', implemented:true, check:function(p){ return p.stats.mistakesResolved >= 20; } },
   // 連続系(プレイ連続日数。ログインのみでは加算されず、ゲーム完走時にのみカウント)
   { id:'streak3', name:'三日坊主クリア', category:'連続', desc:'3日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 3; } },
   { id:'streak7', name:'週間戦士', category:'連続', desc:'7日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 7; } },
@@ -614,6 +624,28 @@ function updateRank(profile, sessionScore) {
 
   // 表示用ランクは「今月の最高到達」。まだ何も無ければビギナー。
   profile.displayedRankKey = profile.bestRankKeyThisMonth || 'beginner';
+}
+
+// ゲーム完走時(endGame)にのみ呼び出す。
+// セッション中に間違えた単語をプロフィールの苦手単語リストへマージする。
+// 既に記録済みの単語は間違い回数を加算し、resolved を false に戻す(再度間違えたため)。
+function mergeMistakesIntoProfile(profile, sessionMistakes) {
+  if (!profile.mistakes) profile.mistakes = [];
+  if (!sessionMistakes || sessionMistakes.length === 0) return;
+  var now = new Date().toISOString();
+  sessionMistakes.forEach(function(m) {
+    var idx = -1;
+    for (var i = 0; i < profile.mistakes.length; i++) {
+      if (profile.mistakes[i].english === m.english && profile.mistakes[i].level === m.level) { idx = i; break; }
+    }
+    if (idx !== -1) {
+      profile.mistakes[idx].missedCount += 1;
+      profile.mistakes[idx].lastDate = now;
+      profile.mistakes[idx].resolved = false;
+    } else {
+      profile.mistakes.push({ english: m.english, japanese: m.japanese, level: m.level, missedCount: 1, lastDate: now, resolved: false });
+    }
+  });
 }
 
 function showScreen(id) {
@@ -853,6 +885,7 @@ function beginGame() {
     combo: 0,
     maxCombo: 0,
     hadMistake: false,
+    mistakes: [],
     timeLeft: 60,
     timerId: null
   };
@@ -920,6 +953,7 @@ function submitGameAnswer() {
   } else {
     g.combo = 0;
     g.hadMistake = true;
+    g.mistakes.push({ english: word.english, japanese: word.japanese, level: state.selectedLevel });
     box.style.background = '#450a0a';
   }
 
@@ -1004,6 +1038,7 @@ async function endGame() {
 
     updatePlayStreak(state.profile);
     updateRank(state.profile, g.score);
+    mergeMistakesIntoProfile(state.profile, g.mistakes);
 
     var newlyEarnedTitles = updateEarnedTitles(state.profile);
     updateUnlockedRewards(state.profile);
@@ -1274,6 +1309,63 @@ function renderRankScreen() {
   $('rank-tier-list').innerHTML = html;
 }
 
+/* ---------- Stage 3-5: 苦手単語トラッキング 画面ロジック ---------- */
+function goMistakes() {
+  if (!state.profile) { goHome(); return; }
+  ensureStats(state.profile);
+  showScreen('screen-mistakes');
+  renderMistakesList();
+}
+
+function renderMistakesList() {
+  var mistakes = (state.profile && state.profile.mistakes) ? state.profile.mistakes : [];
+  var listEl = $('mistakes-list');
+
+  var indexed = [];
+  mistakes.forEach(function(m, i) {
+    if (!m.resolved) indexed.push({ m: m, idx: i });
+  });
+  indexed.sort(function(a, b) { return b.m.missedCount - a.m.missedCount; });
+
+  if (indexed.length === 0) {
+    listEl.innerHTML = '<p style="text-align:center; color:#94a3b8;">苦手な単語はありません。素晴らしい！</p>';
+    return;
+  }
+
+  var html = '';
+  indexed.forEach(function(entry) {
+    var m = entry.m;
+    var dateStr = m.lastDate ? new Date(m.lastDate).toLocaleDateString('ja-JP') : '';
+    html += '<div class="ranking-item">' +
+      '<div style="flex:1;">' +
+        '<div style="font-weight:bold;">' + escapeHtml(m.english) + ' - ' + escapeHtml(m.japanese) + '</div>' +
+        '<div style="font-size:11px; color:#94a3b8;">' + escapeHtml(m.level) + '　間違い' + m.missedCount + '回　最終:' + dateStr + '</div>' +
+      '</div>' +
+      '<button class="mistake-resolve-btn" data-idx="' + entry.idx + '" style="background:#22c55e; border:none; color:white; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;">克服</button>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+
+  var btns = document.querySelectorAll('.mistake-resolve-btn');
+  btns.forEach(function(btn) {
+    btn.onclick = function() {
+      var idx = parseInt(btn.getAttribute('data-idx'), 10);
+      resolveMistake(idx);
+    };
+  });
+}
+
+async function resolveMistake(idx) {
+  if (!state.profile || !state.profile.mistakes || !state.profile.mistakes[idx]) return;
+  state.profile.mistakes[idx].resolved = true;
+  var stats = ensureStats(state.profile);
+  stats.mistakesResolved = (stats.mistakesResolved || 0) + 1;
+  updateEarnedTitles(state.profile);
+  updateUnlockedRewards(state.profile);
+  await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  renderMistakesList();
+}
+
 /* ---------- 管理者 ---------- */
 async function submitAdminPassword() {
   var val = $('input-adminpw').value;
@@ -1375,6 +1467,7 @@ function wireUpEvents() {
   $('btn-show-titles').onclick = goTitles;
   $('btn-show-rewards').onclick = goRewards;
   $('btn-show-rank').onclick = goRank;
+  $('btn-show-mistakes').onclick = goMistakes;
   $('btn-admin-login').onclick = goAdminLogin;
 
   $('btn-playpw-submit').onclick = submitPlayPassword;
@@ -1414,6 +1507,8 @@ function wireUpEvents() {
   $('btn-rewards-back').onclick = goHome;
 
   $('btn-rank-back').onclick = goHome;
+
+  $('btn-mistakes-back').onclick = goHome;
 
   $('btn-adminlogin-submit').onclick = submitAdminPassword;
   $('btn-adminlogin-back').onclick = goHome;
