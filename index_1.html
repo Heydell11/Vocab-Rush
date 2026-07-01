@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOCAB RUSH</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https:;">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 0; background: #050308; color: white; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+  .btn { padding: 14px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s; font-size: 16px; width: 100%; margin: 8px 0; }
+  .btn-primary { background: linear-gradient(135deg, #d946ef, #8b5cf6); color: white; }
+  .btn-primary:hover { transform: scale(1.02); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-dark { background: #1e293b; color: white; border: 1px solid #64748b; }
+  .btn-dark:hover { background: #334155; }
+  .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+  .card { background: #1a1730; border: 1px solid #ffffff22; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .title { font-size: 36px; font-weight: 900; text-align: center; margin: 20px 0; font-style: italic; }
+  input, select { width: 100%; padding: 12px; margin: 8px 0; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 16px; font-family: inherit; }
+  input:focus, select:focus { outline: none; border-color: #d946ef; }
+  .hidden { display: none !important; }
+  .center { text-align: center; }
+  .error-text { color: #f87171; text-align: center; font-size: 14px; min-height: 20px; }
+  .ranking-item { background: #0f172a; padding: 12px; border-radius: 8px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; }
+  .rank-num { font-weight: 900; color: #fbbf24; min-width: 30px; }
+  .score-val { color: #22d3ee; font-weight: bold; font-size: 18px; }
+  .level-btn { text-align: left; padding: 16px; }
+  .level-btn .sub { font-size: 12px; opacity: 0.8; font-weight: normal; }
+  .stat-box { text-align: center; background: #0f172a; border-radius: 8px; padding: 12px; }
+  .stat-box .val { font-size: 24px; font-weight: 900; }
+  .stat-box .label { font-size: 11px; color: #94a3b8; text-transform: uppercase; }
+  .tabs { display: flex; gap: 8px; margin: 10px 0; }
+  .tab-btn { flex: 1; padding: 8px; border-radius: 6px; background: #1e293b; color: #94a3b8; border: none; cursor: pointer; font-weight: bold; font-size: 12px; }
+  .tab-btn.active { background: #8b5cf6; color: white; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="title">VOCAB <span style="color: #d946ef;">RUSH</span></div>
+
+  <!-- LOADING -->
+  <div id="screen-loading" class="card center">
+    <p>読み込み中...</p>
+  </div>
+
+  <!-- HOME -->
+  <div id="screen-home" class="card hidden">
+    <h2 class="center" style="margin-top:0;">ホーム</h2>
+    <button class="btn btn-primary" id="btn-battle-start">バトル開始</button>
+    <button class="btn btn-dark" id="btn-show-ranking">ランキング</button>
+    <button class="btn btn-dark" id="btn-show-titles">🏅 称号</button>
+    <button class="btn btn-dark" id="btn-show-rewards">🎁 リワード</button>
+    <button class="btn btn-dark" id="btn-admin-login">管理者</button>
+  </div>
+
+  <!-- PLAY PASSWORD -->
+  <div id="screen-playpw" class="card hidden">
+    <h2>合言葉を入力</h2>
+    <input type="password" id="input-playpw" placeholder="合言葉">
+    <p class="error-text" id="error-playpw"></p>
+    <button class="btn btn-primary" id="btn-playpw-submit">決定</button>
+    <button class="btn btn-dark" id="btn-playpw-back">戻る</button>
+  </div>
+
+  <!-- STUDENT ID -->
+  <div id="screen-studentid" class="card hidden">
+    <h2>生徒IDを入力</h2>
+    <input type="text" id="input-studentid" placeholder="例: A3F7K9P2" style="text-transform:uppercase;">
+    <p class="error-text" id="error-studentid"></p>
+    <button class="btn btn-primary" id="btn-studentid-submit">決定</button>
+    <button class="btn btn-dark" id="btn-studentid-back">戻る</button>
+  </div>
+
+  <!-- PROFILE SETUP -->
+  <div id="screen-profilesetup" class="card hidden">
+    <h2 class="center">プレイヤー作成</h2>
+    <p class="center" style="color:#94a3b8; font-family:monospace;" id="profilesetup-id"></p>
+    <input type="text" id="input-setup-name" placeholder="ニックネーム" maxlength="20">
+    <select id="input-setup-year"></select>
+    <p style="font-size:12px; color:#94a3b8; margin-top:16px;">アバターを選択</p>
+    <div id="face-options" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;"></div>
+    <button class="btn btn-primary" id="btn-profilesetup-confirm" style="margin-top:16px;">ゲームを始める</button>
+  </div>
+
+  <!-- LEVEL SELECT -->
+  <div id="screen-levelselect" class="card hidden">
+    <h2 class="center">レベルを選択</h2>
+    <button class="btn btn-primary level-btn" data-level="中1">中学1年<div class="sub">基礎レベル</div></button>
+    <button class="btn btn-primary level-btn" data-level="中2">中学2年<div class="sub">標準レベル</div></button>
+    <button class="btn btn-primary level-btn" data-level="中3">中学3年<div class="sub">応用レベル</div></button>
+    <button class="btn btn-primary level-btn" data-level="卒業">卒業レベル<div class="sub">総合・入試レベル</div></button>
+    <button class="btn btn-dark" id="btn-levelselect-back" style="margin-top:16px;">戻る</button>
+  </div>
+
+  <!-- COUNTDOWN -->
+  <div id="screen-countdown" class="card hidden center">
+    <p style="color:#94a3b8; text-transform:uppercase; letter-spacing:2px;">Get Ready</p>
+    <div id="countdown-num" style="font-size:80px; font-weight:900; font-style:italic; color:#d946ef;">3</div>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="card hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div style="font-weight:900; font-size:20px;">⏱ <span id="game-time">60</span>s</div>
+      <div style="font-weight:900; font-size:20px; color:#22d3ee;"><span id="game-score">0</span> PTS</div>
+    </div>
+    <div style="text-align:center; background:#0f172a; padding:32px; border-radius:12px; margin:16px 0;" id="game-word-box">
+      <p style="font-size:11px; color:#94a3b8; margin:0; text-transform:uppercase; letter-spacing:2px;">問題</p>
+      <p id="game-japanese" style="font-size:36px; font-weight:900; margin:8px 0;"></p>
+    </div>
+    <input type="text" id="game-input" placeholder="英単語を入力" autocomplete="off" autocapitalize="off" style="font-size:20px; text-align:center;">
+    <button class="btn btn-primary" id="btn-game-submit">ATTACK</button>
+    <p class="center" style="font-size:12px; color:#94a3b8;">正解: <span id="game-correct">0</span> / 試行: <span id="game-attempted">0</span></p>
+    <button class="btn btn-dark" id="btn-game-abandon">終了する</button>
+  </div>
+
+  <!-- RESULT -->
+  <div id="screen-result" class="card hidden">
+    <h2 class="center" style="margin-top:0;">結果</h2>
+    <div class="center" style="background:linear-gradient(135deg,#4c1d95,#155e75); border-radius:12px; padding:24px; margin:16px 0;">
+      <p id="result-score" style="font-size:48px; font-weight:900; margin:0;">0</p>
+      <p style="font-size:11px; color:#cbd5e1; text-transform:uppercase; letter-spacing:2px;">Final Score</p>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+      <div class="stat-box"><div class="val" id="result-correct" style="color:#22d3ee;">0</div><div class="label">Hits</div></div>
+      <div class="stat-box"><div class="val" id="result-combo" style="color:#fb923c;">0</div><div class="label">Max Combo</div></div>
+      <div class="stat-box"><div class="val" id="result-accuracy" style="color:#34d399;">0%</div><div class="label">Accuracy</div></div>
+    </div>
+    <div id="result-new-titles"></div>
+    <button class="btn btn-primary" id="btn-result-retry" style="margin-top:16px;">別のレベルへ</button>
+    <button class="btn btn-dark" id="btn-result-ranking">ランキングを見る</button>
+    <button class="btn btn-dark" id="btn-result-home">ホームへ</button>
+  </div>
+
+  <!-- RANKING -->
+  <div id="screen-ranking" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🏆 ランキング</h2>
+    <div class="tabs" id="ranking-level-tabs">
+      <button class="tab-btn" data-level="中1">中1</button>
+      <button class="tab-btn" data-level="中2">中2</button>
+      <button class="tab-btn" data-level="中3">中3</button>
+      <button class="tab-btn" data-level="卒業">卒業</button>
+    </div>
+    <div id="ranking-list" style="max-height:400px; overflow-y:auto;"></div>
+    <button class="btn btn-dark" id="btn-ranking-back" style="margin-top:16px;">戻る</button>
+  </div>
+
+  <!-- TITLES -->
+  <div id="screen-titles" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🏅 称号</h2>
+    <p class="center" style="font-size:12px; color:#94a3b8;">獲得数: <span id="titles-earned-count">0</span> / <span id="titles-total-count">0</span></p>
+    <p style="font-size:12px; color:#94a3b8;">表示する称号を最大3つまで選択できます(タップで選択/解除)</p>
+    <div id="titles-list" style="max-height:400px; overflow-y:auto;"></div>
+    <p class="center" id="titles-save-msg" style="color:#34d399; font-size:13px; min-height:18px;"></p>
+    <button class="btn btn-primary" id="btn-titles-save">保存</button>
+    <button class="btn btn-dark" id="btn-titles-back">戻る</button>
+  </div>
+
+  <!-- REWARDS -->
+  <div id="screen-rewards" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🎁 リワード</h2>
+    <p style="font-size:12px; color:#94a3b8; margin-bottom:4px;">アバター(タップで選択)</p>
+    <div id="rewards-face-list" style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px;"></div>
+    <p style="font-size:12px; color:#94a3b8; margin:16px 0 4px 0;">カラー(タップで選択)</p>
+    <div id="rewards-color-list" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;"></div>
+    <p class="center" id="rewards-save-msg" style="color:#34d399; font-size:13px; min-height:18px; margin-top:12px;"></p>
+    <button class="btn btn-primary" id="btn-rewards-save">保存</button>
+    <button class="btn btn-dark" id="btn-rewards-back">戻る</button>
+  </div>
+
+  <!-- ADMIN LOGIN -->
+  <div id="screen-adminlogin" class="card hidden">
+    <h2>管理者ログイン</h2>
+    <input type="password" id="input-adminpw" placeholder="パスワード">
+    <p class="error-text" id="error-adminpw"></p>
+    <button class="btn btn-primary" id="btn-adminlogin-submit">ログイン</button>
+    <button class="btn btn-dark" id="btn-adminlogin-back">戻る</button>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="screen-adminpanel" class="card hidden">
+    <h2 style="margin-top:0;">⚙ 管理者パネル</h2>
+
+    <h3>単語管理</h3>
+    <select id="admin-level-select"></select>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <input type="text" id="admin-word-en" placeholder="英単語">
+      <input type="text" id="admin-word-jp" placeholder="日本語">
+    </div>
+    <button class="btn btn-primary" id="btn-admin-add-word">単語を追加</button>
+    <div id="admin-word-list" style="max-height:200px; overflow-y:auto; background:#0f172a; border-radius:8px; padding:8px;"></div>
+
+    <h3>生徒ID発行</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <select id="admin-issue-year"></select>
+      <input type="number" id="admin-issue-count" value="5" min="1" max="100">
+    </div>
+    <button class="btn btn-primary" id="btn-admin-issue-ids">IDを発行</button>
+    <div id="admin-issued-list" style="background:#0f172a; border-radius:8px; padding:8px; max-height:150px; overflow-y:auto; font-family:monospace; font-size:13px;"></div>
+
+    <h3>プレイ用合言葉</h3>
+    <input type="text" id="admin-playpw-input" placeholder="新しい合言葉">
+    <button class="btn btn-primary" id="btn-admin-save-playpw">保存</button>
+    <p class="center" id="admin-save-msg" style="color:#34d399; font-size:13px;"></p>
+
+    <button class="btn btn-dark" id="btn-adminpanel-home" style="margin-top:20px;">ホームへ</button>
+  </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBVr-eOfbZ7VyS1BNdMWcgxFy5cA5G8Iqc",
+  authDomain: "vocab-rush-e19d8.firebaseapp.com",
+  projectId: "vocab-rush-e19d8",
+  storageBucket: "vocab-rush-e19d8.firebasestorage.app",
+  messagingSenderId: "313243244560",
+  appId: "1:313243244560:web:3a63dba214a2435965d295"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+
+function keyToDocId(key) { return key.replace(/[^a-zA-Z0-9_-]/g, "_"); }
+
+async function dbGet(key, shared) {
+  try {
+    const col = shared ? "shared" : "personal";
+    const ref = doc(db, col, keyToDocId(key));
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return JSON.parse(snap.data().value);
+  } catch (e) { console.error("dbGet error:", key, e); return null; }
+}
+
+async function dbSet(key, value, shared) {
+  try {
+    const col = shared ? "shared" : "personal";
+    const ref = doc(db, col, keyToDocId(key));
+    await setDoc(ref, { value: JSON.stringify(value) });
+    return true;
+  } catch (e) { console.error("dbSet error:", key, e); return false; }
+}
+
+// 管理者専用ドキュメント(vocab-words / play-password / student-ids)への書き込み。
+// Firestoreルール側で _adminAuth ハッシュの一致を要求しているため、
+// 通常の dbSet ではなくこちらを使う。
+async function dbSetAdmin(key, value, adminHash) {
+  try {
+    const ref = doc(db, "shared", keyToDocId(key));
+    await setDoc(ref, { value: JSON.stringify(value), _adminAuth: adminHash });
+    return true;
+  } catch (e) { console.error("dbSetAdmin error:", key, e); return false; }
+}
+
+signInAnonymously(auth).catch(e => console.error("Auth error:", e));
+
+// grab everything we need onto window so the non-module script below can use it
+window.__fb = { dbGet, dbSet, dbSetAdmin };
+
+auth.onAuthStateChanged(function(user) {
+  if (user) {
+    window.__fbReady = true;
+    window.dispatchEvent(new Event('fb-ready'));
+  }
+});
+</script>
+
+<script>
+/* ===== VOCAB RUSH - PHASE 1 ===== */
+
+var DEFAULT_WORDS = [
+  {english:'apple',japanese:'りんご',level:'中1'},{english:'dog',japanese:'犬',level:'中1'},
+  {english:'cat',japanese:'猫',level:'中1'},{english:'book',japanese:'本',level:'中1'},
+  {english:'school',japanese:'学校',level:'中1'},{english:'friend',japanese:'友達',level:'中1'},
+  {english:'family',japanese:'家族',level:'中1'},{english:'teacher',japanese:'先生',level:'中1'},
+  {english:'student',japanese:'生徒',level:'中1'},{english:'music',japanese:'音楽',level:'中1'},
+  {english:'morning',japanese:'朝',level:'中1'},{english:'night',japanese:'夜',level:'中1'},
+  {english:'big',japanese:'大きい',level:'中1'},{english:'small',japanese:'小さい',level:'中1'},
+  {english:'new',japanese:'新しい',level:'中1'},{english:'old',japanese:'古い',level:'中1'},
+  {english:'like',japanese:'好きである',level:'中1'},{english:'play',japanese:'遊ぶ',level:'中1'},
+  {english:'study',japanese:'勉強する',level:'中1'},{english:'eat',japanese:'食べる',level:'中1'},
+  {english:'weather',japanese:'天気',level:'中2'},{english:'yesterday',japanese:'昨日',level:'中2'},
+  {english:'tomorrow',japanese:'明日',level:'中2'},{english:'because',japanese:'なぜなら',level:'中2'},
+  {english:'important',japanese:'重要な',level:'中2'},{english:'difficult',japanese:'難しい',level:'中2'},
+  {english:'interesting',japanese:'面白い',level:'中2'},{english:'beautiful',japanese:'美しい',level:'中2'},
+  {english:'happy',japanese:'幸せな',level:'中2'},{english:'famous',japanese:'有名な',level:'中2'},
+  {english:'popular',japanese:'人気のある',level:'中2'},{english:'decide',japanese:'決める',level:'中2'},
+  {english:'finish',japanese:'終える',level:'中2'},{english:'continue',japanese:'続ける',level:'中2'},
+  {english:'example',japanese:'例',level:'中3'},{english:'question',japanese:'質問',level:'中3'},
+  {english:'practice',japanese:'練習する',level:'中3'},{english:'remember',japanese:'覚える',level:'中3'},
+  {english:'understand',japanese:'理解する',level:'中3'},{english:'suggest',japanese:'提案する',level:'中3'},
+  {english:'however',japanese:'しかしながら',level:'中3'},{english:'although',japanese:'〜にもかかわらず',level:'中3'},
+  {english:'therefore',japanese:'それゆえに',level:'中3'},{english:'technology',japanese:'技術',level:'中3'},
+  {english:'information',japanese:'情報',level:'中3'},{english:'population',japanese:'人口',level:'中3'},
+  {english:'education',japanese:'教育',level:'卒業'},{english:'achievement',japanese:'達成',level:'卒業'},
+  {english:'responsibility',japanese:'責任',level:'卒業'},{english:'environment',japanese:'環境',level:'卒業'},
+  {english:'communication',japanese:'コミュニケーション',level:'卒業'},{english:'independent',japanese:'独立した',level:'卒業'},
+  {english:'confident',japanese:'自信のある',level:'卒業'},{english:'available',japanese:'利用可能な',level:'卒業'},
+  {english:'appropriate',japanese:'適切な',level:'卒業'},{english:'significant',japanese:'重要な',level:'卒業'}
+];
+
+var ADMIN_PASSWORD_HASH = '7d6fff6eec25cc5960ddc4e18101d02dad345db5eaf6210755826ef965450810';
+var DEFAULT_PLAY_PASSWORD = 'eigo123';
+var FACE_OPTIONS = ['🐶','🐱','🐻','🐼','🦊','🐸','🐵','🦁'];
+var LEVELS = ['中1','中2','中3','卒業'];
+
+var state = {
+  allWords: DEFAULT_WORDS,
+  playPassword: DEFAULT_PLAY_PASSWORD,
+  studentIds: [],
+  rankings: {},
+  studentId: null,
+  profile: null,
+  selectedLevel: null,
+  setupFace: FACE_OPTIONS[0],
+  game: null,
+  rankingLevel: '中1',
+  adminAuthHash: null,
+  titleSelection: []
+};
+
+function $(id) { return document.getElementById(id); }
+
+async function sha256(str) {
+  var enc = new TextEncoder().encode(str);
+  var buf = await crypto.subtle.digest('SHA-256', enc);
+  var arr = Array.from(new Uint8Array(buf));
+  return arr.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+// Stage 3-1: 統計トラッキング基盤。
+// 旧プロフィール(stats未保持)にも後付けで初期化する。
+function ensureStats(profile) {
+  if (!profile.stats) {
+    profile.stats = {
+      totalScore: profile.totalScore || 0,
+      bestAccuracy: 0,
+      bestCombo: 0,
+      exactScoresSeen: [],
+      exactAccuracySeen: [],
+      earlyBird: false,
+      nightOwl: false,
+      levelsPlayed: [],
+      comeback: false,
+      practiceCount: 0,
+      practiceCorrect: 0,
+      mistakesResolved: 0
+    };
+  }
+  // フィールド単位の後方互換マイグレーション(stats自体は存在するが新フィールドが無いケース)
+  if (!profile.stats.exactAccuracySeen) profile.stats.exactAccuracySeen = [];
+  if (!profile.earnedTitleKeys) profile.earnedTitleKeys = [];
+  if (!profile.displayedTitleKeys) profile.displayedTitleKeys = [];
+  if (typeof profile.streakDays !== 'number') profile.streakDays = 0;
+  if (typeof profile.bestStreakDays !== 'number') profile.bestStreakDays = 0;
+  if (profile.lastPlayDate === undefined) profile.lastPlayDate = null;
+  if (!profile.color) profile.color = 'blue';
+  if (!profile.unlockedRewardFaces) profile.unlockedRewardFaces = [];
+  if (!profile.unlockedRewardColors) profile.unlockedRewardColors = [];
+  return profile.stats;
+}
+
+/* ---------- Stage 3-2: 称号システム ---------- */
+// implemented:false の称号は判定に必要なデータ(連続ログイン・練習モード・苦手単語)が
+// まだ実装されていないため、常にfalseを返す(将来のStageで有効化する)。
+var TITLES = [
+  // スコア系
+  { id:'beginner', name:'英単語ビギナー', category:'スコア', desc:'0pt', implemented:true, check:function(p){ return p.totalScore >= 0; } },
+  { id:'apprentice', name:'見習いタイピスト', category:'スコア', desc:'50pt', implemented:true, check:function(p){ return p.totalScore >= 50; } },
+  { id:'hunter', name:'単語ハンター', category:'スコア', desc:'150pt', implemented:true, check:function(p){ return p.totalScore >= 150; } },
+  { id:'skilled', name:'スキルドタイパー', category:'スコア', desc:'300pt', implemented:true, check:function(p){ return p.totalScore >= 300; } },
+  { id:'fastTyper', name:'高速入力士', category:'スコア', desc:'500pt', implemented:true, check:function(p){ return p.totalScore >= 500; } },
+  { id:'wordsmith', name:'ワードスミス', category:'スコア', desc:'800pt', implemented:true, check:function(p){ return p.totalScore >= 800; } },
+  { id:'expert', name:'英単語エキスパート', category:'スコア', desc:'1200pt', implemented:true, check:function(p){ return p.totalScore >= 1200; } },
+  { id:'master', name:'タイピングマスター', category:'スコア', desc:'1800pt', implemented:true, check:function(p){ return p.totalScore >= 1800; } },
+  { id:'champion', name:'チャンピオン', category:'スコア', desc:'2500pt', implemented:true, check:function(p){ return p.totalScore >= 2500; } },
+  { id:'genius', name:'英語の天才', category:'スコア', desc:'3500pt', implemented:true, check:function(p){ return p.totalScore >= 3500; } },
+  { id:'legend', name:'伝説のタイピスト', category:'スコア', desc:'5000pt', implemented:true, check:function(p){ return p.totalScore >= 5000; } },
+  { id:'grandmaster', name:'グランドマスター', category:'スコア', desc:'7000pt', implemented:true, check:function(p){ return p.totalScore >= 7000; } },
+  { id:'godhand', name:'神の手', category:'スコア', desc:'10000pt', implemented:true, check:function(p){ return p.totalScore >= 10000; } },
+  // 正答率系
+  { id:'accurateEgg', name:'正確無比の卵', category:'正答率', desc:'正答率70%', implemented:true, check:function(p){ return p.stats.bestAccuracy >= 70; } },
+  { id:'sharpshooter', name:'シャープシューター', category:'正答率', desc:'正答率85%', implemented:true, check:function(p){ return p.stats.bestAccuracy >= 85; } },
+  { id:'mrPerfect', name:'ミスター・パーフェクト', category:'正答率', desc:'正答率95%', implemented:true, check:function(p){ return p.stats.bestAccuracy >= 95; } },
+  { id:'flawless', name:'完全無欠', category:'正答率', desc:'正答率100%', implemented:true, check:function(p){ return p.stats.bestAccuracy >= 100; } },
+  // コンボ系
+  { id:'comboBreakerReserve', name:'コンボブレイカー予備軍', category:'コンボ', desc:'コンボ10', implemented:true, check:function(p){ return p.stats.bestCombo >= 10; } },
+  { id:'comboKing', name:'コンボキング', category:'コンボ', desc:'コンボ20', implemented:true, check:function(p){ return p.stats.bestCombo >= 20; } },
+  { id:'renkeki', name:'連撃の覇者', category:'コンボ', desc:'コンボ30', implemented:true, check:function(p){ return p.stats.bestCombo >= 30; } },
+  { id:'infiniteCombo', name:'無限コンボ使い', category:'コンボ', desc:'コンボ50', implemented:true, check:function(p){ return p.stats.bestCombo >= 50; } },
+  // 特殊系(実装済み)
+  { id:'lucky777', name:'ラッキー777', category:'特殊', desc:'スコア777pt達成', implemented:true, check:function(p){ return p.stats.exactScoresSeen.indexOf(777) !== -1; } },
+  { id:'sevens', name:'セブンズ', category:'特殊', desc:'正答率77%達成', implemented:true, check:function(p){ return p.stats.exactAccuracySeen.indexOf(77) !== -1; } },
+  { id:'earlyBirdTitle', name:'早起きは三文の徳', category:'特殊', desc:'朝6時-8時にプレイ', implemented:true, check:function(p){ return p.stats.earlyBird === true; } },
+  { id:'nightOwlTitle', name:'夜更かし英語マスター', category:'特殊', desc:'夜23時以降にプレイ', implemented:true, check:function(p){ return p.stats.nightOwl === true; } },
+  { id:'allLevels', name:'全レベル制覇', category:'特殊', desc:'全4レベルをプレイ', implemented:true, check:function(p){ return p.stats.levelsPlayed.length >= 4; } },
+  { id:'comebackSpirit', name:'カムバック魂', category:'特殊', desc:'不正解後コンボ20以上に再到達', implemented:true, check:function(p){ return p.stats.comeback === true; } },
+  // 特殊系(練習モード・苦手単語トラッキング実装後に有効化)
+  { id:'doryokuka', name:'努力家', category:'特殊', desc:'練習モード10回(未実装)', implemented:false, check:function(){ return false; } },
+  { id:'tanren', name:'鍛錬の達人', category:'特殊', desc:'練習モード50回(未実装)', implemented:false, check:function(){ return false; } },
+  { id:'jakutenKokufuku', name:'弱点克服者', category:'特殊', desc:'練習で累計100問正解(未実装)', implemented:false, check:function(){ return false; } },
+  { id:'revenger', name:'リベンジャー', category:'特殊', desc:'苦手単語20個克服(未実装)', implemented:false, check:function(){ return false; } },
+  // 連続系(プレイ連続日数。ログインのみでは加算されず、ゲーム完走時にのみカウント)
+  { id:'streak3', name:'三日坊主クリア', category:'連続', desc:'3日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 3; } },
+  { id:'streak7', name:'週間戦士', category:'連続', desc:'7日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 7; } },
+  { id:'streak14', name:'デディケーター', category:'連続', desc:'14日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 14; } },
+  { id:'streak30', name:'不屈の意志', category:'連続', desc:'30日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 30; } },
+  { id:'streak50', name:'半世紀の偉業', category:'連続', desc:'50日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 50; } },
+  { id:'streak60', name:'鉄人タイパー', category:'連続', desc:'60日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 60; } },
+  { id:'streak100', name:'伝説の継続者', category:'連続', desc:'100日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 100; } }
+];
+
+function updateEarnedTitles(profile) {
+  ensureStats(profile);
+  var newly = [];
+  TITLES.forEach(function(t) {
+    if (!t.implemented) return;
+    if (profile.earnedTitleKeys.indexOf(t.id) !== -1) return;
+    if (t.check(profile)) {
+      profile.earnedTitleKeys.push(t.id);
+      newly.push(t);
+    }
+  });
+  return newly;
+}
+
+/* ---------- Stage 3-3: リワード(アバター・カラー) ---------- */
+// 注: 元仕様書には「解放20種/8種」という記載がありますが、
+// 実際に列挙されていた絵文字/カラー名はそれぞれ24種・12種でした(数字と実数が不一致)。
+// ここでは実際に列挙されていたリスト(24アバター・12カラー)を正として実装しています。
+//
+// また、元仕様書には「どの称号がどのリワードを解放するか」の対応が定義されていなかったため、
+// 難易度が低い称号から順に対応づける形で仮に設計しました。人間側の意図と異なる場合は
+// unlockTitleId を差し替えるだけで調整できます。
+var BASE_COLORS = [
+  { id:'blue', name:'ブルー', hex:'#3b82f6' },
+  { id:'pink', name:'ピンク', hex:'#ec4899' },
+  { id:'green', name:'グリーン', hex:'#22c55e' },
+  { id:'purple', name:'パープル', hex:'#a855f7' },
+  { id:'orange', name:'オレンジ', hex:'#f97316' }
+];
+
+var REWARD_FACES = [
+  { emoji:'👻', unlockTitleId:'apprentice' },
+  { emoji:'🐹', unlockTitleId:'hunter' },
+  { emoji:'🐔', unlockTitleId:'skilled' },
+  { emoji:'🐧', unlockTitleId:'fastTyper' },
+  { emoji:'🐲', unlockTitleId:'wordsmith' },
+  { emoji:'🐳', unlockTitleId:'expert' },
+  { emoji:'😎', unlockTitleId:'master' },
+  { emoji:'🐉', unlockTitleId:'champion' },
+  { emoji:'🦖', unlockTitleId:'genius' },
+  { emoji:'🐺', unlockTitleId:'legend' },
+  { emoji:'🤖', unlockTitleId:'grandmaster' },
+  { emoji:'🦋', unlockTitleId:'godhand' },
+  { emoji:'🦄', unlockTitleId:'accurateEgg' },
+  { emoji:'🥷', unlockTitleId:'sharpshooter' },
+  { emoji:'🧛', unlockTitleId:'mrPerfect' },
+  { emoji:'🐮', unlockTitleId:'flawless' },
+  { emoji:'🐢', unlockTitleId:'comboBreakerReserve' },
+  { emoji:'🧙', unlockTitleId:'comboKing' },
+  { emoji:'🐨', unlockTitleId:'renkeki' },
+  { emoji:'🦉', unlockTitleId:'infiniteCombo' },
+  { emoji:'🐙', unlockTitleId:'lucky777' },
+  { emoji:'👾', unlockTitleId:'sevens' },
+  { emoji:'😈', unlockTitleId:'earlyBirdTitle' },
+  { emoji:'🦸', unlockTitleId:'nightOwlTitle' }
+];
+
+var REWARD_COLORS = [
+  { id:'yellow', name:'イエロー', hex:'#eab308', unlockTitleId:'allLevels' },
+  { id:'teal', name:'ティール', hex:'#14b8a6', unlockTitleId:'comebackSpirit' },
+  { id:'red', name:'レッド', hex:'#ef4444', unlockTitleId:'doryokuka' },
+  { id:'indigo', name:'インディゴ', hex:'#6366f1', unlockTitleId:'tanren' },
+  { id:'rose', name:'ローズ', hex:'#f43f5e', unlockTitleId:'jakutenKokufuku' },
+  { id:'sakura', name:'サクラ', hex:'#f9a8d4', unlockTitleId:'revenger' },
+  { id:'midnight', name:'ミッドナイト', hex:'#1e293b', unlockTitleId:'streak3' },
+  { id:'lava', name:'ラヴァ', hex:'#dc2626', unlockTitleId:'streak7' },
+  { id:'goldsp', name:'ゴールドSP', hex:'#facc15', unlockTitleId:'streak14' },
+  { id:'neon', name:'ネオン', hex:'#d946ef', unlockTitleId:'streak30' },
+  { id:'imperial', name:'インペリアル', hex:'#7c3aed', unlockTitleId:'streak50' },
+  { id:'rainbow', name:'レインボー', hex:'linear-gradient(90deg,#f87171,#facc15,#4ade80,#38bdf8,#a78bfa)', unlockTitleId:'streak100' }
+];
+
+function updateUnlockedRewards(profile) {
+  if (!profile.unlockedRewardFaces) profile.unlockedRewardFaces = [];
+  if (!profile.unlockedRewardColors) profile.unlockedRewardColors = [];
+  REWARD_FACES.forEach(function(r) {
+    if (profile.earnedTitleKeys.indexOf(r.unlockTitleId) !== -1 && profile.unlockedRewardFaces.indexOf(r.emoji) === -1) {
+      profile.unlockedRewardFaces.push(r.emoji);
+    }
+  });
+  REWARD_COLORS.forEach(function(r) {
+    if (profile.earnedTitleKeys.indexOf(r.unlockTitleId) !== -1 && profile.unlockedRewardColors.indexOf(r.id) === -1) {
+      profile.unlockedRewardColors.push(r.id);
+    }
+  });
+}
+
+function findTitleName(titleId) {
+  for (var i = 0; i < TITLES.length; i++) {
+    if (TITLES[i].id === titleId) return TITLES[i].name;
+  }
+  return titleId;
+}
+
+function showScreen(id) {
+  var screens = document.querySelectorAll('[id^="screen-"]');
+  for (var i = 0; i < screens.length; i++) screens[i].classList.add('hidden');
+  var target = $(id);
+  if (target) target.classList.remove('hidden');
+}
+
+function getMonthKey() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function getDateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// ストリーク(連続プレイ日数)の更新。
+// 「ログインしただけ」では呼ばれず、1ゲームを完走した(endGame)時にのみ呼び出すこと。
+// 同日中に何度プレイしても2回目以降はカウントしない。
+function updatePlayStreak(profile) {
+  var today = getDateKey(new Date());
+  if (profile.lastPlayDate === today) {
+    return; // 本日分は既にカウント済み
+  }
+  var yesterday = getDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  if (profile.lastPlayDate === yesterday) {
+    profile.streakDays += 1;
+  } else {
+    profile.streakDays = 1; // 前日プレイしていない(または初回) → リセットして1からカウント
+  }
+  profile.lastPlayDate = today;
+  profile.bestStreakDays = Math.max(profile.bestStreakDays, profile.streakDays);
+}
+
+function getCurrentYearOptions() {
+  var y = new Date().getFullYear();
+  var years = [];
+  for (var i = y + 1; i >= y - 3; i--) years.push(i);
+  return years;
+}
+
+/* ---------- データ読み込み ---------- */
+async function loadAllData() {
+  var words = await window.__fb.dbGet('vocab-words', true);
+  if (words && Array.isArray(words) && words.length) state.allWords = words;
+
+  var pw = await window.__fb.dbGet('play-password', true);
+  if (pw) state.playPassword = pw;
+
+  var ids = await window.__fb.dbGet('student-ids', true);
+  if (ids && Array.isArray(ids)) state.studentIds = ids;
+
+  var ranks = await window.__fb.dbGet('rankings', true);
+  if (ranks) state.rankings = ranks;
+}
+
+/* ---------- 初期化 ---------- */
+async function initApp() {
+  await loadAllData();
+  populateYearSelects();
+  populateFaceOptions();
+  populateAdminLevelSelect();
+  showScreen('screen-home');
+}
+
+function populateYearSelects() {
+  var years = getCurrentYearOptions();
+  var setupSel = $('input-setup-year');
+  var issueSel = $('admin-issue-year');
+  setupSel.innerHTML = '';
+  issueSel.innerHTML = '';
+  years.forEach(function(y) {
+    var o1 = document.createElement('option');
+    o1.value = y; o1.textContent = y + '年度';
+    setupSel.appendChild(o1);
+    var o2 = document.createElement('option');
+    o2.value = y; o2.textContent = y + '年度';
+    issueSel.appendChild(o2);
+  });
+}
+
+function populateFaceOptions() {
+  var box = $('face-options');
+  box.innerHTML = '';
+  FACE_OPTIONS.forEach(function(f) {
+    var btn = document.createElement('button');
+    btn.textContent = f;
+    btn.className = 'btn';
+    btn.style.fontSize = '28px';
+    btn.style.padding = '10px';
+    btn.style.background = (f === state.setupFace) ? '#8b5cf6' : '#1e293b';
+    btn.onclick = function() {
+      state.setupFace = f;
+      populateFaceOptions();
+    };
+    box.appendChild(btn);
+  });
+}
+
+function populateAdminLevelSelect() {
+  var sel = $('admin-level-select');
+  sel.innerHTML = '';
+  LEVELS.forEach(function(lv) {
+    var o = document.createElement('option');
+    o.value = lv; o.textContent = lv;
+    sel.appendChild(o);
+  });
+  sel.onchange = renderAdminWordList;
+  renderAdminWordList();
+}
+
+/* ---------- 画面遷移 ---------- */
+function goHome() { showScreen('screen-home'); }
+
+function goPlayPasswordGate() {
+  $('input-playpw').value = '';
+  $('error-playpw').textContent = '';
+  showScreen('screen-playpw');
+  $('input-playpw').focus();
+}
+
+function goStudentIdGate() {
+  $('input-studentid').value = '';
+  $('error-studentid').textContent = '';
+  showScreen('screen-studentid');
+  $('input-studentid').focus();
+}
+
+function goLevelSelect() { showScreen('screen-levelselect'); }
+
+async function goRanking() {
+  showScreen('screen-ranking');
+  setRankingLevel(state.rankingLevel);
+}
+
+function goAdminLogin() {
+  $('input-adminpw').value = '';
+  $('error-adminpw').textContent = '';
+  showScreen('screen-adminlogin');
+  $('input-adminpw').focus();
+}
+
+function goAdminPanel() {
+  populateAdminLevelSelect();
+  showScreen('screen-adminpanel');
+}
+
+/* ---------- 認証 ---------- */
+function submitPlayPassword() {
+  var val = $('input-playpw').value;
+  if (val === state.playPassword) {
+    goStudentIdGate();
+  } else {
+    $('error-playpw').textContent = '合言葉が正しくありません';
+  }
+}
+
+async function submitStudentId() {
+  var val = $('input-studentid').value.trim().toUpperCase();
+  if (!val) return;
+  if (state.studentIds.indexOf(val) === -1) {
+    $('error-studentid').textContent = 'そのIDは登録されていません';
+    return;
+  }
+  state.studentId = val;
+  showScreen('screen-loading');
+
+  var profile = await window.__fb.dbGet('profile-' + val, true);
+  if (profile) {
+    ensureStats(profile);
+    state.profile = profile;
+    goLevelSelect();
+  } else {
+    $('profilesetup-id').textContent = 'ID: ' + val;
+    state.setupFace = FACE_OPTIONS[0];
+    populateFaceOptions();
+    showScreen('screen-profilesetup');
+  }
+}
+
+async function confirmProfileSetup() {
+  var name = $('input-setup-name').value.trim();
+  if (!name) return;
+  var year = parseInt($('input-setup-year').value, 10);
+  var profile = {
+    studentId: state.studentId,
+    name: name,
+    enrollYear: year,
+    face: state.setupFace,
+    totalScore: 0
+  };
+  ensureStats(profile);
+  state.profile = profile;
+  await window.__fb.dbSet('profile-' + state.studentId, profile, true);
+  goLevelSelect();
+}
+
+/* ---------- ゲームロジック ---------- */
+function startGameForLevel(level) {
+  state.selectedLevel = level;
+  var countdown = 3;
+  $('countdown-num').textContent = countdown;
+  showScreen('screen-countdown');
+  var timer = setInterval(function() {
+    countdown -= 1;
+    if (countdown <= 0) {
+      clearInterval(timer);
+      beginGame();
+    } else {
+      $('countdown-num').textContent = countdown;
+    }
+  }, 700);
+}
+
+function shuffleArray(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+function beginGame() {
+  var pool = state.allWords.filter(function(w) { return w.level === state.selectedLevel; });
+  if (pool.length === 0) pool = DEFAULT_WORDS.filter(function(w) { return w.level === state.selectedLevel; });
+  var shuffled = shuffleArray(pool);
+
+  state.game = {
+    queue: shuffled,
+    index: 0,
+    score: 0,
+    correct: 0,
+    attempted: 0,
+    combo: 0,
+    maxCombo: 0,
+    hadMistake: false,
+    timeLeft: 60,
+    timerId: null
+  };
+
+  $('game-score').textContent = '0';
+  $('game-time').textContent = '60';
+  $('game-correct').textContent = '0';
+  $('game-attempted').textContent = '0';
+  $('game-input').value = '';
+  showCurrentWord();
+  showScreen('screen-game');
+  $('game-input').focus();
+
+  state.game.timerId = setInterval(gameTick, 1000);
+}
+
+function showCurrentWord() {
+  var g = state.game;
+  if (!g) return;
+  if (g.index >= g.queue.length) {
+    g.queue = g.queue.concat(shuffleArray(g.queue));
+  }
+  var word = g.queue[g.index];
+  $('game-japanese').textContent = word ? word.japanese : '';
+}
+
+function gameTick() {
+  var g = state.game;
+  if (!g) return;
+  g.timeLeft -= 1;
+  $('game-time').textContent = g.timeLeft;
+  if (g.timeLeft <= 0) {
+    clearInterval(g.timerId);
+    endGame();
+  }
+}
+
+function getComboMultiplier(c) {
+  if (c >= 10) return 3;
+  if (c >= 5) return 2;
+  if (c >= 3) return 1.5;
+  return 1;
+}
+
+function submitGameAnswer() {
+  var g = state.game;
+  if (!g) return;
+  var input = $('game-input').value.trim();
+  if (!input) return;
+  var word = g.queue[g.index];
+  if (!word) return;
+
+  g.attempted += 1;
+  var correct = input.toLowerCase() === word.english.toLowerCase();
+
+  var box = $('game-word-box');
+  if (correct) {
+    g.combo += 1;
+    var mult = getComboMultiplier(g.combo);
+    var pts = Math.round(10 * mult);
+    g.score += pts;
+    g.correct += 1;
+    g.maxCombo = Math.max(g.maxCombo, g.combo);
+    box.style.background = '#052e1a';
+  } else {
+    g.combo = 0;
+    g.hadMistake = true;
+    box.style.background = '#450a0a';
+  }
+
+  $('game-score').textContent = g.score;
+  $('game-correct').textContent = g.correct;
+  $('game-attempted').textContent = g.attempted;
+  $('game-input').value = '';
+
+  g.index += 1;
+
+  setTimeout(function() {
+    box.style.background = '#0f172a';
+    if (state.game) {
+      showCurrentWord();
+      $('game-input').focus();
+    }
+  }, 300);
+}
+
+function abandonGame() {
+  if (state.game && state.game.timerId) clearInterval(state.game.timerId);
+  state.game = null;
+  goHome();
+}
+
+async function endGame() {
+  var g = state.game;
+  if (!g) return;
+  var accuracy = g.attempted > 0 ? Math.round((g.correct / g.attempted) * 100) : 0;
+
+  $('result-score').textContent = g.score;
+  $('result-correct').textContent = g.correct + ' / ' + g.attempted;
+  $('result-combo').textContent = g.maxCombo;
+  $('result-accuracy').textContent = accuracy + '%';
+
+  // ランキング保存
+  var level = state.selectedLevel;
+  var mk = getMonthKey();
+  if (!state.rankings[level]) state.rankings[level] = { monthly: [], monthKey: mk };
+  if (state.rankings[level].monthKey !== mk) {
+    state.rankings[level].monthly = [];
+    state.rankings[level].monthKey = mk;
+  }
+  var entry = {
+    studentId: state.studentId,
+    name: state.profile ? state.profile.name : state.studentId,
+    score: g.score,
+    correct: g.correct,
+    attempted: g.attempted,
+    accuracy: accuracy,
+    maxCombo: g.maxCombo,
+    date: new Date().toISOString()
+  };
+  state.rankings[level].monthly = state.rankings[level].monthly
+    .filter(function(e) { return e.studentId !== entry.studentId; })
+    .concat(entry)
+    .sort(function(a, b) { return b.score - a.score; })
+    .slice(0, 20);
+
+  await window.__fb.dbSet('rankings', state.rankings, true);
+
+  if (state.profile) {
+    var stats = ensureStats(state.profile);
+    var now = new Date();
+    var hour = now.getHours();
+
+    stats.bestAccuracy = Math.max(stats.bestAccuracy, accuracy);
+    stats.bestCombo = Math.max(stats.bestCombo, g.maxCombo);
+    if (g.score === 777 && stats.exactScoresSeen.indexOf(777) === -1) {
+      stats.exactScoresSeen.push(777);
+    }
+    if (accuracy === 77 && stats.exactAccuracySeen.indexOf(77) === -1) {
+      stats.exactAccuracySeen.push(77);
+    }
+    if (hour >= 6 && hour < 8) stats.earlyBird = true;
+    if (hour >= 23) stats.nightOwl = true;
+    if (stats.levelsPlayed.indexOf(level) === -1) stats.levelsPlayed.push(level);
+    if (g.hadMistake && g.maxCombo >= 20) stats.comeback = true;
+
+    state.profile.totalScore = (state.profile.totalScore || 0) + g.score;
+    stats.totalScore = state.profile.totalScore;
+
+    updatePlayStreak(state.profile);
+
+    var newlyEarnedTitles = updateEarnedTitles(state.profile);
+    updateUnlockedRewards(state.profile);
+    renderResultNewTitles(newlyEarnedTitles);
+
+    await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  } else {
+    renderResultNewTitles([]);
+  }
+
+  state.game = null;
+  showScreen('screen-result');
+}
+
+/* ---------- ランキング表示 ---------- */
+function setRankingLevel(level) {
+  state.rankingLevel = level;
+  var tabs = document.querySelectorAll('#ranking-level-tabs .tab-btn');
+  tabs.forEach(function(t) {
+    t.classList.toggle('active', t.getAttribute('data-level') === level);
+  });
+  renderRankingList();
+}
+
+function renderRankingList() {
+  var listEl = $('ranking-list');
+  var data = state.rankings[state.rankingLevel];
+  var monthly = (data && data.monthly) ? data.monthly : [];
+  if (monthly.length === 0) {
+    listEl.innerHTML = '<p style="text-align:center; color:#94a3b8;">まだ記録がありません</p>';
+    return;
+  }
+  var html = '';
+  monthly.forEach(function(entry, i) {
+    html += '<div class="ranking-item">' +
+      '<span class="rank-num">#' + (i + 1) + '</span>' +
+      '<div style="flex:1; padding:0 10px;">' +
+        '<div style="font-weight:bold;">' + escapeHtml(entry.name) + '</div>' +
+        '<div style="font-size:11px; color:#94a3b8;">正答率 ' + entry.accuracy + '%　最大コンボ ' + entry.maxCombo + '</div>' +
+      '</div>' +
+      '<span class="score-val">' + entry.score + '</span>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ---------- Stage 3-2: 称号システム 画面ロジック ---------- */
+function renderResultNewTitles(newlyEarnedTitles) {
+  var box = $('result-new-titles');
+  if (!box) return;
+  if (!newlyEarnedTitles || newlyEarnedTitles.length === 0) {
+    box.innerHTML = '';
+    return;
+  }
+  var html = '<div style="background:#1e293b; border:1px solid #fbbf24; border-radius:8px; padding:12px; text-align:center;">' +
+    '<p style="margin:0 0 6px 0; font-size:12px; color:#fbbf24; font-weight:bold;">🎉 新しい称号を獲得しました！</p>';
+  newlyEarnedTitles.forEach(function(t) {
+    html += '<p style="margin:2px 0; font-weight:bold;">' + escapeHtml(t.name) + '</p>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function goTitles() {
+  if (!state.profile) { goHome(); return; }
+  ensureStats(state.profile);
+  state.titleSelection = (state.profile.displayedTitleKeys || []).slice();
+  showScreen('screen-titles');
+  renderTitlesList();
+}
+
+function renderTitlesList() {
+  var earned = (state.profile && state.profile.earnedTitleKeys) ? state.profile.earnedTitleKeys : [];
+  var implementedTotal = TITLES.filter(function(t) { return t.implemented; }).length;
+  $('titles-earned-count').textContent = earned.length;
+  $('titles-total-count').textContent = implementedTotal;
+
+  var categories = ['スコア', '正答率', 'コンボ', '特殊', '連続'];
+  var html = '';
+  categories.forEach(function(cat) {
+    var inCat = TITLES.filter(function(t) { return t.category === cat; });
+    if (inCat.length === 0) return;
+    html += '<p style="font-size:12px; color:#94a3b8; margin:12px 0 4px 0;">' + escapeHtml(cat) + '系</p>';
+    inCat.forEach(function(t) {
+      var isEarned = earned.indexOf(t.id) !== -1;
+      var isSelected = state.titleSelection.indexOf(t.id) !== -1;
+      if (!t.implemented) {
+        html += '<div class="ranking-item" style="opacity:0.4;">' +
+          '<span>🔒 ' + escapeHtml(t.name) + '</span>' +
+          '<span style="font-size:11px; color:#94a3b8;">' + escapeHtml(t.desc) + '</span>' +
+        '</div>';
+      } else if (isEarned) {
+        html += '<div class="ranking-item title-toggle-btn" data-id="' + t.id + '" style="cursor:pointer; border:2px solid ' + (isSelected ? '#d946ef' : 'transparent') + ';">' +
+          '<span>' + (isSelected ? '✅ ' : '🏅 ') + escapeHtml(t.name) + '</span>' +
+          '<span style="font-size:11px; color:#94a3b8;">' + escapeHtml(t.desc) + '</span>' +
+        '</div>';
+      } else {
+        html += '<div class="ranking-item" style="opacity:0.5;">' +
+          '<span>🔒 ' + escapeHtml(t.name) + '</span>' +
+          '<span style="font-size:11px; color:#94a3b8;">' + escapeHtml(t.desc) + '</span>' +
+        '</div>';
+      }
+    });
+  });
+  $('titles-list').innerHTML = html;
+
+  var toggleBtns = document.querySelectorAll('.title-toggle-btn');
+  toggleBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      var id = btn.getAttribute('data-id');
+      var idx = state.titleSelection.indexOf(id);
+      if (idx !== -1) {
+        state.titleSelection.splice(idx, 1);
+      } else {
+        if (state.titleSelection.length >= 3) {
+          $('titles-save-msg').textContent = '表示できる称号は最大3つまでです';
+          setTimeout(function() { $('titles-save-msg').textContent = ''; }, 1800);
+          return;
+        }
+        state.titleSelection.push(id);
+      }
+      renderTitlesList();
+    };
+  });
+}
+
+async function saveTitles() {
+  if (!state.profile) return;
+  state.profile.displayedTitleKeys = state.titleSelection.slice(0, 3);
+  await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  $('titles-save-msg').textContent = '保存しました！';
+  setTimeout(function() { $('titles-save-msg').textContent = ''; }, 1800);
+}
+
+/* ---------- Stage 3-3: リワード(アバター・カラー) 画面ロジック ---------- */
+function goRewards() {
+  if (!state.profile) { goHome(); return; }
+  ensureStats(state.profile);
+  state.rewardSelection = {
+    face: state.profile.face,
+    color: state.profile.color || 'blue'
+  };
+  showScreen('screen-rewards');
+  renderRewardsList();
+}
+
+function renderRewardsList() {
+  var unlockedFaces = state.profile.unlockedRewardFaces || [];
+  var unlockedColors = state.profile.unlockedRewardColors || [];
+
+  var faceHtml = '';
+  FACE_OPTIONS.forEach(function(f) {
+    faceHtml += buildRewardFaceButton(f, true, null);
+  });
+  REWARD_FACES.forEach(function(r) {
+    var isUnlocked = unlockedFaces.indexOf(r.emoji) !== -1;
+    faceHtml += buildRewardFaceButton(r.emoji, isUnlocked, r.unlockTitleId);
+  });
+  $('rewards-face-list').innerHTML = faceHtml;
+
+  var colorHtml = '';
+  BASE_COLORS.forEach(function(c) {
+    colorHtml += buildRewardColorButton(c, true, null);
+  });
+  REWARD_COLORS.forEach(function(r) {
+    var isUnlocked = unlockedColors.indexOf(r.id) !== -1;
+    colorHtml += buildRewardColorButton(r, isUnlocked, r.unlockTitleId);
+  });
+  $('rewards-color-list').innerHTML = colorHtml;
+
+  var faceBtns = document.querySelectorAll('.reward-face-btn:not(.locked)');
+  faceBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      state.rewardSelection.face = btn.getAttribute('data-face');
+      renderRewardsList();
+    };
+  });
+  var colorBtns = document.querySelectorAll('.reward-color-btn:not(.locked)');
+  colorBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      state.rewardSelection.color = btn.getAttribute('data-color');
+      renderRewardsList();
+    };
+  });
+}
+
+function buildRewardFaceButton(emoji, unlocked, unlockTitleId) {
+  var isSelected = state.rewardSelection.face === emoji;
+  if (!unlocked) {
+    return '<div class="reward-face-btn locked" style="text-align:center; padding:10px; background:#1e293b; border-radius:8px; opacity:0.35;" title="' + escapeHtml(findTitleName(unlockTitleId)) + '達成で解放">' +
+      '<div style="font-size:22px;">🔒</div>' +
+    '</div>';
+  }
+  return '<button class="reward-face-btn" data-face="' + emoji + '" style="text-align:center; padding:10px; background:#1e293b; border-radius:8px; font-size:22px; border:2px solid ' + (isSelected ? '#d946ef' : 'transparent') + '; cursor:pointer;">' + emoji + '</button>';
+}
+
+function buildRewardColorButton(colorObj, unlocked, unlockTitleId) {
+  var isSelected = state.rewardSelection.color === colorObj.id;
+  var swatchBg = colorObj.hex.indexOf('gradient') !== -1 ? colorObj.hex : colorObj.hex;
+  if (!unlocked) {
+    return '<div class="reward-color-btn locked" style="text-align:center; padding:8px; background:#1e293b; border-radius:8px; opacity:0.35;" title="' + escapeHtml(findTitleName(unlockTitleId)) + '達成で解放">' +
+      '<div style="width:24px; height:24px; border-radius:50%; background:#475569; margin:0 auto 4px auto;"></div>' +
+      '<div style="font-size:10px;">🔒</div>' +
+    '</div>';
+  }
+  return '<button class="reward-color-btn" data-color="' + colorObj.id + '" style="text-align:center; padding:8px; background:#1e293b; border-radius:8px; border:2px solid ' + (isSelected ? '#d946ef' : 'transparent') + '; cursor:pointer;">' +
+    '<div style="width:24px; height:24px; border-radius:50%; background:' + swatchBg + '; margin:0 auto 4px auto;"></div>' +
+    '<div style="font-size:10px; color:#cbd5e1;">' + escapeHtml(colorObj.name) + '</div>' +
+  '</button>';
+}
+
+async function saveRewards() {
+  if (!state.profile) return;
+  state.profile.face = state.rewardSelection.face;
+  state.profile.color = state.rewardSelection.color;
+  await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  $('rewards-save-msg').textContent = '保存しました！';
+  setTimeout(function() { $('rewards-save-msg').textContent = ''; }, 1800);
+}
+
+/* ---------- 管理者 ---------- */
+async function submitAdminPassword() {
+  var val = $('input-adminpw').value;
+  var hash = await sha256(val);
+  if (hash === ADMIN_PASSWORD_HASH) {
+    state.adminAuthHash = hash;
+    goAdminPanel();
+  } else {
+    $('error-adminpw').textContent = 'パスワードが正しくありません';
+  }
+}
+
+function renderAdminWordList() {
+  var level = $('admin-level-select').value;
+  var words = state.allWords.filter(function(w) { return w.level === level; });
+  var listEl = $('admin-word-list');
+  if (words.length === 0) {
+    listEl.innerHTML = '<p style="color:#94a3b8; text-align:center; margin:0;">単語がありません</p>';
+    return;
+  }
+  var html = '';
+  words.forEach(function(w) {
+    html += '<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #334155;">' +
+      '<span>' + escapeHtml(w.english) + ' - ' + escapeHtml(w.japanese) + '</span>' +
+      '<button class="admin-delete-word-btn" data-english="' + escapeHtml(w.english) + '" data-level="' + escapeHtml(w.level) + '" style="background:none; border:none; color:#f87171; cursor:pointer; font-size:13px;">削除</button>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+
+  var delBtns = listEl.querySelectorAll('.admin-delete-word-btn');
+  delBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      var eng = btn.getAttribute('data-english');
+      var lvl = btn.getAttribute('data-level');
+      deleteWord(eng, lvl);
+    };
+  });
+}
+
+async function addWord() {
+  var eng = $('admin-word-en').value.trim();
+  var jpn = $('admin-word-jp').value.trim();
+  var level = $('admin-level-select').value;
+  if (!eng || !jpn) return;
+  state.allWords.push({ english: eng, japanese: jpn, level: level });
+  await window.__fb.dbSetAdmin('vocab-words', state.allWords, state.adminAuthHash);
+  $('admin-word-en').value = '';
+  $('admin-word-jp').value = '';
+  renderAdminWordList();
+}
+
+async function deleteWord(eng, level) {
+  state.allWords = state.allWords.filter(function(w) {
+    return !(w.english === eng && w.level === level);
+  });
+  await window.__fb.dbSetAdmin('vocab-words', state.allWords, state.adminAuthHash);
+  renderAdminWordList();
+}
+
+function generateRandomId() {
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var id = '';
+  for (var i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
+
+async function issueStudentIds() {
+  var count = parseInt($('admin-issue-count').value, 10) || 1;
+  count = Math.max(1, Math.min(100, count));
+  var existing = {};
+  state.studentIds.forEach(function(id) { existing[id] = true; });
+  var newIds = [];
+  while (newIds.length < count) {
+    var id = generateRandomId();
+    if (existing[id]) continue;
+    existing[id] = true;
+    newIds.push(id);
+    state.studentIds.push(id);
+  }
+  await window.__fb.dbSetAdmin('student-ids', state.studentIds, state.adminAuthHash);
+  $('admin-issued-list').innerHTML = '<strong>発行したID:</strong><br>' + newIds.join('<br>');
+}
+
+async function saveAdminPlayPassword() {
+  var pw = $('admin-playpw-input').value.trim();
+  if (!pw) return;
+  state.playPassword = pw;
+  await window.__fb.dbSetAdmin('play-password', pw, state.adminAuthHash);
+  $('admin-playpw-input').value = '';
+  var msg = $('admin-save-msg');
+  msg.textContent = '保存しました！';
+  setTimeout(function() { msg.textContent = ''; }, 2000);
+}
+
+/* ---------- イベントリスナー登録 ---------- */
+function wireUpEvents() {
+  $('btn-battle-start').onclick = goPlayPasswordGate;
+  $('btn-show-ranking').onclick = goRanking;
+  $('btn-show-titles').onclick = goTitles;
+  $('btn-show-rewards').onclick = goRewards;
+  $('btn-admin-login').onclick = goAdminLogin;
+
+  $('btn-playpw-submit').onclick = submitPlayPassword;
+  $('btn-playpw-back').onclick = goHome;
+  $('input-playpw').onkeydown = function(e) { if (e.key === 'Enter') submitPlayPassword(); };
+
+  $('btn-studentid-submit').onclick = submitStudentId;
+  $('btn-studentid-back').onclick = goHome;
+  $('input-studentid').onkeydown = function(e) { if (e.key === 'Enter') submitStudentId(); };
+
+  $('btn-profilesetup-confirm').onclick = confirmProfileSetup;
+
+  var levelBtns = document.querySelectorAll('.level-btn');
+  levelBtns.forEach(function(btn) {
+    btn.onclick = function() { startGameForLevel(btn.getAttribute('data-level')); };
+  });
+  $('btn-levelselect-back').onclick = goHome;
+
+  $('btn-game-submit').onclick = submitGameAnswer;
+  $('game-input').onkeydown = function(e) { if (e.key === 'Enter') submitGameAnswer(); };
+  $('btn-game-abandon').onclick = abandonGame;
+
+  $('btn-result-retry').onclick = goLevelSelect;
+  $('btn-result-ranking').onclick = goRanking;
+  $('btn-result-home').onclick = goHome;
+
+  var rankTabs = document.querySelectorAll('#ranking-level-tabs .tab-btn');
+  rankTabs.forEach(function(tab) {
+    tab.onclick = function() { setRankingLevel(tab.getAttribute('data-level')); };
+  });
+  $('btn-ranking-back').onclick = goHome;
+
+  $('btn-titles-save').onclick = saveTitles;
+  $('btn-titles-back').onclick = goHome;
+
+  $('btn-rewards-save').onclick = saveRewards;
+  $('btn-rewards-back').onclick = goHome;
+
+  $('btn-adminlogin-submit').onclick = submitAdminPassword;
+  $('btn-adminlogin-back').onclick = goHome;
+  $('input-adminpw').onkeydown = function(e) { if (e.key === 'Enter') submitAdminPassword(); };
+
+  $('btn-admin-add-word').onclick = addWord;
+  $('btn-admin-issue-ids').onclick = issueStudentIds;
+  $('btn-admin-save-playpw').onclick = saveAdminPlayPassword;
+  $('btn-adminpanel-home').onclick = goHome;
+}
+
+/* ---------- 起動 ---------- */
+function boot() {
+  wireUpEvents();
+  if (window.__fbReady) {
+    initApp();
+  } else {
+    window.addEventListener('fb-ready', initApp, { once: true });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+</script>
+
+</body>
+</html>
