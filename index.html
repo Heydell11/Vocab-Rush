@@ -6,204 +6,241 @@
 <title>VOCAB RUSH</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https:;">
 <script src="https://cdn.tailwindcss.com"></script>
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyBVr-eOfbZ7VyS1BNdMWcgxFy5cA5G8Iqc",
-    authDomain: "vocab-rush-e19d8.firebaseapp.com",
-    projectId: "vocab-rush-e19d8",
-    storageBucket: "vocab-rush-e19d8.firebasestorage.app",
-    messagingSenderId: "313243244560",
-    appId: "1:313243244560:web:3a63dba214a2435965d295"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-
-  signInAnonymously(auth).catch(e => console.error("Auth error:", e));
-
-  window.vocabApp = {
-    db, auth,
-    async get(key, shared = false) {
-      try {
-        const col = shared ? "shared" : "personal";
-        const ref = doc(db, col, key.replace(/[:/]/g, "_"));
-        const snap = await getDoc(ref);
-        return snap.exists() ? JSON.parse(snap.data().value) : null;
-      } catch (e) { console.error("get error:", e); return null; }
-    },
-    async set(key, value, shared = false) {
-      try {
-        const col = shared ? "shared" : "personal";
-        const ref = doc(db, col, key.replace(/[:/]/g, "_"));
-        await setDoc(ref, { value: JSON.stringify(value) });
-      } catch (e) { console.error("set error:", e); }
-    }
-  };
-  
-  window.firebaseReady = true;
-</script>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 0; background: #050308; color: white; font-family: system-ui, -apple-system, sans-serif; }
-  .btn { padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+  body { margin: 0; padding: 0; background: #050308; color: white; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+  .btn { padding: 14px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s; font-size: 16px; width: 100%; margin: 8px 0; }
   .btn-primary { background: linear-gradient(135deg, #d946ef, #8b5cf6); color: white; }
-  .btn-primary:hover { transform: scale(1.05); }
+  .btn-primary:hover { transform: scale(1.02); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-dark { background: #1e293b; color: white; border: 1px solid #64748b; }
   .btn-dark:hover { background: #334155; }
-  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-  .card { background: #1e1b4b; border: 1px solid #ffffff20; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
-  .title { font-size: 32px; font-weight: 900; text-align: center; margin: 20px 0; }
-  input, select, textarea { width: 100%; padding: 10px; margin: 10px 0; background: #0f172a; border: 1px solid #64748b; border-radius: 6px; color: white; font-family: inherit; }
+  .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+  .card { background: #1a1730; border: 1px solid #ffffff22; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .title { font-size: 36px; font-weight: 900; text-align: center; margin: 20px 0; font-style: italic; }
+  input, select { width: 100%; padding: 12px; margin: 8px 0; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 16px; font-family: inherit; }
   input:focus, select:focus { outline: none; border-color: #d946ef; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 15px 0; }
-  .badge { display: inline-block; background: #8b5cf6; padding: 6px 12px; border-radius: 20px; font-size: 12px; margin: 5px; }
-  .hidden { display: none; }
-  .ranking-item { background: #0f172a; padding: 12px; border-radius: 6px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; }
-  .ranking-item .rank { font-weight: 900; color: #fbbf24; min-width: 30px; }
-  .ranking-item .score { color: #22d3ee; font-weight: bold; }
+  .hidden { display: none !important; }
+  .center { text-align: center; }
+  .error-text { color: #f87171; text-align: center; font-size: 14px; min-height: 20px; }
+  .ranking-item { background: #0f172a; padding: 12px; border-radius: 8px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; }
+  .rank-num { font-weight: 900; color: #fbbf24; min-width: 30px; }
+  .score-val { color: #22d3ee; font-weight: bold; font-size: 18px; }
+  .level-btn { text-align: left; padding: 16px; }
+  .level-btn .sub { font-size: 12px; opacity: 0.8; font-weight: normal; }
+  .stat-box { text-align: center; background: #0f172a; border-radius: 8px; padding: 12px; }
+  .stat-box .val { font-size: 24px; font-weight: 900; }
+  .stat-box .label { font-size: 11px; color: #94a3b8; text-transform: uppercase; }
+  .tabs { display: flex; gap: 8px; margin: 10px 0; }
+  .tab-btn { flex: 1; padding: 8px; border-radius: 6px; background: #1e293b; color: #94a3b8; border: none; cursor: pointer; font-weight: bold; font-size: 12px; }
+  .tab-btn.active { background: #8b5cf6; color: white; }
 </style>
 </head>
 <body>
 
-<div class="container" id="app">
+<div class="container">
   <div class="title">VOCAB <span style="color: #d946ef;">RUSH</span></div>
-  
+
+  <!-- LOADING -->
+  <div id="screen-loading" class="card center">
+    <p>読み込み中...</p>
+  </div>
+
   <!-- HOME -->
-  <div id="home" class="card">
-    <h2 style="text-align: center; margin-top: 0;">ホーム</h2>
-    <button class="btn btn-primary" style="width: 100%; margin: 10px 0;" onclick="app.goPlayPasswordGate()">バトル開始</button>
-    <button class="btn btn-dark" style="width: 100%; margin: 10px 0;" onclick="app.goRanking()">ランキング</button>
-    <button class="btn btn-dark" style="width: 100%; margin: 10px 0;" onclick="app.goAdminLogin()">管理者</button>
+  <div id="screen-home" class="card hidden">
+    <h2 class="center" style="margin-top:0;">ホーム</h2>
+    <button class="btn btn-primary" id="btn-battle-start">バトル開始</button>
+    <button class="btn btn-dark" id="btn-show-ranking">ランキング</button>
+    <button class="btn btn-dark" id="btn-admin-login">管理者</button>
   </div>
 
   <!-- PLAY PASSWORD -->
-  <div id="playPasswordGate" class="card hidden">
+  <div id="screen-playpw" class="card hidden">
     <h2>合言葉を入力</h2>
-    <input type="password" id="playPasswordInput" placeholder="合言葉">
-    <button class="btn btn-primary" style="width: 100%;" onclick="app.checkPlayPassword()">決定</button>
-    <button class="btn btn-dark" style="width: 100%;" onclick="app.goHome()">戻る</button>
-    <p id="playPasswordError" style="color: #ef4444; text-align: center;"></p>
+    <input type="password" id="input-playpw" placeholder="合言葉">
+    <p class="error-text" id="error-playpw"></p>
+    <button class="btn btn-primary" id="btn-playpw-submit">決定</button>
+    <button class="btn btn-dark" id="btn-playpw-back">戻る</button>
   </div>
 
   <!-- STUDENT ID -->
-  <div id="studentIdGate" class="card hidden">
+  <div id="screen-studentid" class="card hidden">
     <h2>生徒IDを入力</h2>
-    <input type="text" id="studentIdInput" placeholder="例: A3F7K9P2" style="text-transform: uppercase;">
-    <button class="btn btn-primary" style="width: 100%;" onclick="app.checkStudentId()">決定</button>
-    <button class="btn btn-dark" style="width: 100%;" onclick="app.goHome()">戻る</button>
-    <p id="studentIdError" style="color: #ef4444; text-align: center;"></p>
+    <input type="text" id="input-studentid" placeholder="例: A3F7K9P2" style="text-transform:uppercase;">
+    <p class="error-text" id="error-studentid"></p>
+    <button class="btn btn-primary" id="btn-studentid-submit">決定</button>
+    <button class="btn btn-dark" id="btn-studentid-back">戻る</button>
+  </div>
+
+  <!-- PROFILE SETUP -->
+  <div id="screen-profilesetup" class="card hidden">
+    <h2 class="center">プレイヤー作成</h2>
+    <p class="center" style="color:#94a3b8; font-family:monospace;" id="profilesetup-id"></p>
+    <input type="text" id="input-setup-name" placeholder="ニックネーム" maxlength="20">
+    <select id="input-setup-year"></select>
+    <p style="font-size:12px; color:#94a3b8; margin-top:16px;">アバターを選択</p>
+    <div id="face-options" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;"></div>
+    <button class="btn btn-primary" id="btn-profilesetup-confirm" style="margin-top:16px;">ゲームを始める</button>
   </div>
 
   <!-- LEVEL SELECT -->
-  <div id="levelSelect" class="card hidden">
-    <h2>レベルを選択</h2>
-    <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
-      <button class="btn btn-primary" style="width: 100%; text-align: left;" onclick="app.startGame('中1')">中学1年 - 基礎レベル</button>
-      <button class="btn btn-primary" style="width: 100%; text-align: left;" onclick="app.startGame('中2')">中学2年 - 標準レベル</button>
-      <button class="btn btn-primary" style="width: 100%; text-align: left;" onclick="app.startGame('中3')">中学3年 - 応用レベル</button>
-      <button class="btn btn-primary" style="width: 100%; text-align: left;" onclick="app.startGame('卒業')">卒業レベル - 総合・入試レベル</button>
-    </div>
-    <button class="btn btn-dark" style="width: 100%; margin-top: 20px;" onclick="app.goHome()">戻る</button>
+  <div id="screen-levelselect" class="card hidden">
+    <h2 class="center">レベルを選択</h2>
+    <button class="btn btn-primary level-btn" data-level="中1">中学1年<div class="sub">基礎レベル</div></button>
+    <button class="btn btn-primary level-btn" data-level="中2">中学2年<div class="sub">標準レベル</div></button>
+    <button class="btn btn-primary level-btn" data-level="中3">中学3年<div class="sub">応用レベル</div></button>
+    <button class="btn btn-primary level-btn" data-level="卒業">卒業レベル<div class="sub">総合・入試レベル</div></button>
+    <button class="btn btn-dark" id="btn-levelselect-back" style="margin-top:16px;">戻る</button>
+  </div>
+
+  <!-- COUNTDOWN -->
+  <div id="screen-countdown" class="card hidden center">
+    <p style="color:#94a3b8; text-transform:uppercase; letter-spacing:2px;">Get Ready</p>
+    <div id="countdown-num" style="font-size:80px; font-weight:900; font-style:italic; color:#d946ef;">3</div>
   </div>
 
   <!-- GAME -->
-  <div id="game" class="card hidden">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <div style="font-size: 20px; font-weight: bold; color: #22d3ee;">時間: <span id="timeLeft">60</span>s</div>
-      <div style="font-size: 20px; font-weight: bold; color: #fbbf24;">スコア: <span id="score">0</span></div>
+  <div id="screen-game" class="card hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div style="font-weight:900; font-size:20px;">⏱ <span id="game-time">60</span>s</div>
+      <div style="font-weight:900; font-size:20px; color:#22d3ee;"><span id="game-score">0</span> PTS</div>
     </div>
-    <div style="text-align: center; background: #0f172a; padding: 30px; border-radius: 8px; margin: 20px 0;">
-      <p style="font-size: 12px; color: #94a3b8; margin: 0;">問題</p>
-      <p id="japanese" style="font-size: 40px; font-weight: 900; margin: 10px 0; color: white;"></p>
+    <div style="text-align:center; background:#0f172a; padding:32px; border-radius:12px; margin:16px 0;" id="game-word-box">
+      <p style="font-size:11px; color:#94a3b8; margin:0; text-transform:uppercase; letter-spacing:2px;">問題</p>
+      <p id="game-japanese" style="font-size:36px; font-weight:900; margin:8px 0;"></p>
     </div>
-    <input type="text" id="answer" placeholder="英単語を入力" style="font-size: 18px; padding: 15px;">
-    <button class="btn btn-primary" style="width: 100%;" onclick="app.submitAnswer()">決定</button>
-    <p id="gameFeedback" style="text-align: center; font-size: 14px; min-height: 20px;"></p>
-    <button class="btn btn-dark" style="width: 100%; margin-top: 20px;" onclick="app.abandonGame()">ゲームを終了</button>
+    <input type="text" id="game-input" placeholder="英単語を入力" autocomplete="off" autocapitalize="off" style="font-size:20px; text-align:center;">
+    <button class="btn btn-primary" id="btn-game-submit">ATTACK</button>
+    <p class="center" style="font-size:12px; color:#94a3b8;">正解: <span id="game-correct">0</span> / 試行: <span id="game-attempted">0</span></p>
+    <button class="btn btn-dark" id="btn-game-abandon">終了する</button>
   </div>
 
   <!-- RESULT -->
-  <div id="result" class="card hidden">
-    <h2 style="text-align: center;">ゲーム結果</h2>
-    <div style="text-align: center; background: #0f172a; padding: 20px; border-radius: 8px; margin: 20px 0;">
-      <p style="font-size: 12px; color: #94a3b8;">スコア</p>
-      <p id="finalScore" style="font-size: 48px; font-weight: 900; color: #22d3ee; margin: 0;"></p>
+  <div id="screen-result" class="card hidden">
+    <h2 class="center" style="margin-top:0;">結果</h2>
+    <div class="center" style="background:linear-gradient(135deg,#4c1d95,#155e75); border-radius:12px; padding:24px; margin:16px 0;">
+      <p id="result-score" style="font-size:48px; font-weight:900; margin:0;">0</p>
+      <p style="font-size:11px; color:#cbd5e1; text-transform:uppercase; letter-spacing:2px;">Final Score</p>
     </div>
-    <div class="grid">
-      <div style="text-align: center;"><p style="color: #94a3b8; font-size: 12px;">正解数</p><p id="correctCount" style="font-size: 24px; font-weight: bold;"></p></div>
-      <div style="text-align: center;"><p style="color: #94a3b8; font-size: 12px;">正答率</p><p id="accuracy" style="font-size: 24px; font-weight: bold;"></p></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+      <div class="stat-box"><div class="val" id="result-correct" style="color:#22d3ee;">0</div><div class="label">Hits</div></div>
+      <div class="stat-box"><div class="val" id="result-combo" style="color:#fb923c;">0</div><div class="label">Max Combo</div></div>
+      <div class="stat-box"><div class="val" id="result-accuracy" style="color:#34d399;">0%</div><div class="label">Accuracy</div></div>
     </div>
-    <button class="btn btn-primary" style="width: 100%; margin: 10px 0;" onclick="app.goLevelSelect()">別のレベルをプレイ</button>
-    <button class="btn btn-dark" style="width: 100%;" onclick="app.goHome()">ホームへ</button>
+    <button class="btn btn-primary" id="btn-result-retry" style="margin-top:16px;">別のレベルへ</button>
+    <button class="btn btn-dark" id="btn-result-ranking">ランキングを見る</button>
+    <button class="btn btn-dark" id="btn-result-home">ホームへ</button>
   </div>
 
   <!-- RANKING -->
-  <div id="ranking" class="card hidden">
-    <h2>ランキング</h2>
-    <select id="rankingLevel" onchange="app.loadRanking()" style="margin: 10px 0;">
-      <option value="中1">中1</option>
-      <option value="中2">中2</option>
-      <option value="中3">中3</option>
-      <option value="卒業">卒業</option>
-    </select>
-    <div id="rankingList"></div>
-    <button class="btn btn-dark" style="width: 100%; margin-top: 20px;" onclick="app.goHome()">戻る</button>
+  <div id="screen-ranking" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🏆 ランキング</h2>
+    <div class="tabs" id="ranking-level-tabs">
+      <button class="tab-btn" data-level="中1">中1</button>
+      <button class="tab-btn" data-level="中2">中2</button>
+      <button class="tab-btn" data-level="中3">中3</button>
+      <button class="tab-btn" data-level="卒業">卒業</button>
+    </div>
+    <div id="ranking-list" style="max-height:400px; overflow-y:auto;"></div>
+    <button class="btn btn-dark" id="btn-ranking-back" style="margin-top:16px;">戻る</button>
   </div>
 
   <!-- ADMIN LOGIN -->
-  <div id="adminLogin" class="card hidden">
+  <div id="screen-adminlogin" class="card hidden">
     <h2>管理者ログイン</h2>
-    <input type="password" id="adminPasswordInput" placeholder="パスワード">
-    <button class="btn btn-primary" style="width: 100%;" onclick="app.checkAdminPassword()">ログイン</button>
-    <button class="btn btn-dark" style="width: 100%;" onclick="app.goHome()">戻る</button>
-    <p id="adminError" style="color: #ef4444; text-align: center;"></p>
+    <input type="password" id="input-adminpw" placeholder="パスワード">
+    <p class="error-text" id="error-adminpw"></p>
+    <button class="btn btn-primary" id="btn-adminlogin-submit">ログイン</button>
+    <button class="btn btn-dark" id="btn-adminlogin-back">戻る</button>
   </div>
 
   <!-- ADMIN PANEL -->
-  <div id="adminPanel" class="card hidden">
-    <h2>管理者パネル</h2>
-    
+  <div id="screen-adminpanel" class="card hidden">
+    <h2 style="margin-top:0;">⚙ 管理者パネル</h2>
+
     <h3>単語管理</h3>
-    <select id="adminLevel" style="margin: 10px 0;">
-      <option value="中1">中1</option>
-      <option value="中2">中2</option>
-      <option value="中3">中3</option>
-      <option value="卒業">卒業</option>
-    </select>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0;">
-      <input type="text" id="manualEnglish" placeholder="英単語">
-      <input type="text" id="manualJapanese" placeholder="日本語">
+    <select id="admin-level-select"></select>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <input type="text" id="admin-word-en" placeholder="英単語">
+      <input type="text" id="admin-word-jp" placeholder="日本語">
     </div>
-    <button class="btn btn-primary" style="width: 100%; margin: 10px 0;" onclick="app.addWord()">単語を追加</button>
-    <div id="wordList" style="max-height: 200px; overflow-y: auto; border: 1px solid #64748b; border-radius: 6px; padding: 10px;"></div>
+    <button class="btn btn-primary" id="btn-admin-add-word">単語を追加</button>
+    <div id="admin-word-list" style="max-height:200px; overflow-y:auto; background:#0f172a; border-radius:8px; padding:8px;"></div>
 
-    <h3 style="margin-top: 30px;">生徒ID管理</h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0;">
-      <select id="issueYear" style="margin: 0;">
-        <option value="2024">2024年度</option>
-        <option value="2025">2025年度</option>
-        <option value="2026">2026年度</option>
-      </select>
-      <input type="number" id="issueCount" value="5" min="1" max="100" placeholder="発行数">
+    <h3>生徒ID発行</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <select id="admin-issue-year"></select>
+      <input type="number" id="admin-issue-count" value="5" min="1" max="100">
     </div>
-    <button class="btn btn-primary" style="width: 100%; margin: 10px 0;" onclick="app.issueStudentIds()">IDを発行</button>
-    <div id="issuedIds" style="background: #0f172a; padding: 10px; border-radius: 6px; max-height: 150px; overflow-y: auto;"></div>
+    <button class="btn btn-primary" id="btn-admin-issue-ids">IDを発行</button>
+    <div id="admin-issued-list" style="background:#0f172a; border-radius:8px; padding:8px; max-height:150px; overflow-y:auto; font-family:monospace; font-size:13px;"></div>
 
-    <h3 style="margin-top: 30px;">プレイ用合言葉</h3>
-    <input type="text" id="playPasswordAdmin" placeholder="新しい合言葉">
-    <button class="btn btn-primary" style="width: 100%; margin: 10px 0;" onclick="app.savePlayPassword()">保存</button>
+    <h3>プレイ用合言葉</h3>
+    <input type="text" id="admin-playpw-input" placeholder="新しい合言葉">
+    <button class="btn btn-primary" id="btn-admin-save-playpw">保存</button>
+    <p class="center" id="admin-save-msg" style="color:#34d399; font-size:13px;"></p>
 
-    <button class="btn btn-dark" style="width: 100%; margin-top: 30px;" onclick="app.goHome()">ホームへ</button>
+    <button class="btn btn-dark" id="btn-adminpanel-home" style="margin-top:20px;">ホームへ</button>
   </div>
+
 </div>
 
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBVr-eOfbZ7VyS1BNdMWcgxFy5cA5G8Iqc",
+  authDomain: "vocab-rush-e19d8.firebaseapp.com",
+  projectId: "vocab-rush-e19d8",
+  storageBucket: "vocab-rush-e19d8.firebasestorage.app",
+  messagingSenderId: "313243244560",
+  appId: "1:313243244560:web:3a63dba214a2435965d295"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+
+function keyToDocId(key) { return key.replace(/[^a-zA-Z0-9_-]/g, "_"); }
+
+async function dbGet(key, shared) {
+  try {
+    const col = shared ? "shared" : "personal";
+    const ref = doc(db, col, keyToDocId(key));
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return JSON.parse(snap.data().value);
+  } catch (e) { console.error("dbGet error:", key, e); return null; }
+}
+
+async function dbSet(key, value, shared) {
+  try {
+    const col = shared ? "shared" : "personal";
+    const ref = doc(db, col, keyToDocId(key));
+    await setDoc(ref, { value: JSON.stringify(value) });
+    return true;
+  } catch (e) { console.error("dbSet error:", key, e); return false; }
+}
+
+signInAnonymously(auth).catch(e => console.error("Auth error:", e));
+
+// grab everything we need onto window so the non-module script below can use it
+window.__fb = { dbGet, dbSet };
+
+auth.onAuthStateChanged(function(user) {
+  if (user) {
+    window.__fbReady = true;
+    window.dispatchEvent(new Event('fb-ready'));
+  }
+});
+</script>
+
 <script>
-const DEFAULT_WORDS = [
+/* ===== VOCAB RUSH - PHASE 1 ===== */
+
+var DEFAULT_WORDS = [
   {english:'apple',japanese:'りんご',level:'中1'},{english:'dog',japanese:'犬',level:'中1'},
   {english:'cat',japanese:'猫',level:'中1'},{english:'book',japanese:'本',level:'中1'},
   {english:'school',japanese:'学校',level:'中1'},{english:'friend',japanese:'友達',level:'中1'},
@@ -219,269 +256,580 @@ const DEFAULT_WORDS = [
   {english:'important',japanese:'重要な',level:'中2'},{english:'difficult',japanese:'難しい',level:'中2'},
   {english:'interesting',japanese:'面白い',level:'中2'},{english:'beautiful',japanese:'美しい',level:'中2'},
   {english:'happy',japanese:'幸せな',level:'中2'},{english:'famous',japanese:'有名な',level:'中2'},
+  {english:'popular',japanese:'人気のある',level:'中2'},{english:'decide',japanese:'決める',level:'中2'},
+  {english:'finish',japanese:'終える',level:'中2'},{english:'continue',japanese:'続ける',level:'中2'},
   {english:'example',japanese:'例',level:'中3'},{english:'question',japanese:'質問',level:'中3'},
   {english:'practice',japanese:'練習する',level:'中3'},{english:'remember',japanese:'覚える',level:'中3'},
-  {english:'understand',japanese:'理解する',level:'中3'},{english:'technology',japanese:'技術',level:'中3'},
+  {english:'understand',japanese:'理解する',level:'中3'},{english:'suggest',japanese:'提案する',level:'中3'},
+  {english:'however',japanese:'しかしながら',level:'中3'},{english:'although',japanese:'〜にもかかわらず',level:'中3'},
+  {english:'therefore',japanese:'それゆえに',level:'中3'},{english:'technology',japanese:'技術',level:'中3'},
+  {english:'information',japanese:'情報',level:'中3'},{english:'population',japanese:'人口',level:'中3'},
   {english:'education',japanese:'教育',level:'卒業'},{english:'achievement',japanese:'達成',level:'卒業'},
-  {english:'environment',japanese:'環境',level:'卒業'},{english:'communication',japanese:'コミュニケーション',level:'卒業'}
+  {english:'responsibility',japanese:'責任',level:'卒業'},{english:'environment',japanese:'環境',level:'卒業'},
+  {english:'communication',japanese:'コミュニケーション',level:'卒業'},{english:'independent',japanese:'独立した',level:'卒業'},
+  {english:'confident',japanese:'自信のある',level:'卒業'},{english:'available',japanese:'利用可能な',level:'卒業'},
+  {english:'appropriate',japanese:'適切な',level:'卒業'},{english:'significant',japanese:'重要な',level:'卒業'}
 ];
 
-const ADMIN_PASSWORD = 'sensei123';
-const DEFAULT_PLAY_PASSWORD = 'eigo123';
+var ADMIN_PASSWORD = 'sensei123';
+var DEFAULT_PLAY_PASSWORD = 'eigo123';
+var FACE_OPTIONS = ['🐶','🐱','🐻','🐼','🦊','🐸','🐵','🦁'];
+var LEVELS = ['中1','中2','中3','卒業'];
 
-let app = {
-  db: null,
-  currentScreen: 'home',
-  playPasswordVerified: false,
-  studentId: null,
-  currentLevel: null,
-  gameState: null,
+var state = {
   allWords: DEFAULT_WORDS,
   playPassword: DEFAULT_PLAY_PASSWORD,
-  allStudentIds: [],
+  studentIds: [],
   rankings: {},
-
-  async init() {
-    await this.loadData();
-    this.showScreen('home');
-  },
-
-  async loadData() {
-    const words = await window.vocabApp.get('vocab-words', true);
-    if (words) this.allWords = words;
-    
-    const pw = await window.vocabApp.get('play-password', true);
-    if (pw) this.playPassword = pw;
-    
-    const ids = await window.vocabApp.get('student-ids', true);
-    if (ids) this.allStudentIds = ids;
-    
-    const ranks = await window.vocabApp.get('rankings', true);
-    if (ranks) this.rankings = ranks;
-  },
-
-  showScreen(name) {
-    document.querySelectorAll('[id]').forEach(el => {
-      if (el.id !== 'app' && el.classList) el.classList.add('hidden');
-    });
-    const screen = document.getElementById(name);
-    if (screen) screen.classList.remove('hidden');
-    this.currentScreen = name;
-  },
-
-  goHome() { this.showScreen('home'); },
-  goPlayPasswordGate() { this.showScreen('playPasswordGate'); document.getElementById('playPasswordInput').focus(); },
-  goStudentIdGate() { this.showScreen('studentIdGate'); document.getElementById('studentIdInput').focus(); },
-  goLevelSelect() { this.showScreen('levelSelect'); },
-  goRanking() { this.loadRanking(); this.showScreen('ranking'); },
-  goAdminLogin() { this.showScreen('adminLogin'); document.getElementById('adminPasswordInput').focus(); },
-  goAdminPanel() { this.updateWordList(); this.showScreen('adminPanel'); },
-
-  checkPlayPassword() {
-    const input = document.getElementById('playPasswordInput').value;
-    if (input === this.playPassword) {
-      this.playPasswordVerified = true;
-      document.getElementById('playPasswordInput').value = '';
-      document.getElementById('playPasswordError').textContent = '';
-      this.goStudentIdGate();
-    } else {
-      document.getElementById('playPasswordError').textContent = '合言葉が正しくありません';
-    }
-  },
-
-  checkStudentId() {
-    const input = document.getElementById('studentIdInput').value.toUpperCase();
-    if (!this.allStudentIds.includes(input)) {
-      document.getElementById('studentIdError').textContent = 'そのIDは登録されていません';
-      return;
-    }
-    this.studentId = input;
-    document.getElementById('studentIdInput').value = '';
-    document.getElementById('studentIdError').textContent = '';
-    this.goLevelSelect();
-  },
-
-  startGame(level) {
-    this.currentLevel = level;
-    const pool = this.allWords.filter(w => w.level === level);
-    this.gameState = {
-      pool: pool.sort(() => Math.random() - 0.5),
-      index: 0,
-      score: 0,
-      correct: 0,
-      attempted: 0,
-      timeLeft: 60,
-      startTime: Date.now()
-    };
-    document.getElementById('answer').value = '';
-    document.getElementById('gameFeedback').textContent = '';
-    this.gameLoop();
-    this.showScreen('game');
-    document.getElementById('answer').focus();
-  },
-
-  gameLoop() {
-    if (!this.gameState) return;
-    if (this.gameState.timeLeft <= 0) {
-      this.endGame();
-      return;
-    }
-    const elapsed = Math.floor((Date.now() - this.gameState.startTime) / 1000);
-    this.gameState.timeLeft = 60 - elapsed;
-    document.getElementById('timeLeft').textContent = this.gameState.timeLeft;
-    if (this.gameState.index < this.gameState.pool.length) {
-      const word = this.gameState.pool[this.gameState.index];
-      document.getElementById('japanese').textContent = word.japanese;
-    }
-    setTimeout(() => this.gameLoop(), 100);
-  },
-
-  submitAnswer() {
-    if (!this.gameState || this.gameState.index >= this.gameState.pool.length) return;
-    const input = document.getElementById('answer').value.trim().toLowerCase();
-    const word = this.gameState.pool[this.gameState.index];
-    this.gameState.attempted += 1;
-    if (input === word.english.toLowerCase()) {
-      this.gameState.score += 10;
-      this.gameState.correct += 1;
-      document.getElementById('gameFeedback').textContent = '✓ 正解！';
-      document.getElementById('gameFeedback').style.color = '#10b981';
-    } else {
-      document.getElementById('gameFeedback').textContent = '✗ 不正解 → ' + word.english;
-      document.getElementById('gameFeedback').style.color = '#ef4444';
-    }
-    document.getElementById('score').textContent = this.gameState.score;
-    document.getElementById('answer').value = '';
-    this.gameState.index += 1;
-    setTimeout(() => { document.getElementById('answer').focus(); }, 500);
-  },
-
-  async endGame() {
-    this.gameState.timeLeft = 0;
-    const correct = this.gameState.correct;
-    const attempted = this.gameState.attempted;
-    const accuracy = attempted > 0 ? Math.round(correct / attempted * 100) : 0;
-    document.getElementById('finalScore').textContent = this.gameState.score;
-    document.getElementById('correctCount').textContent = correct + ' / ' + attempted;
-    document.getElementById('accuracy').textContent = accuracy + '%';
-
-    // ランキングに保存
-    if (!this.rankings[this.currentLevel]) this.rankings[this.currentLevel] = [];
-    this.rankings[this.currentLevel].push({
-      studentId: this.studentId,
-      score: this.gameState.score,
-      correct: correct,
-      attempted: attempted,
-      accuracy: accuracy,
-      date: new Date().toISOString()
-    });
-    this.rankings[this.currentLevel].sort((a, b) => b.score - a.score);
-    this.rankings[this.currentLevel] = this.rankings[this.currentLevel].slice(0, 20);
-    await window.vocabApp.set('rankings', this.rankings, true);
-
-    this.gameState = null;
-    this.showScreen('result');
-  },
-
-  abandonGame() {
-    this.gameState = null;
-    this.goHome();
-  },
-
-  async loadRanking() {
-    const level = document.getElementById('rankingLevel').value;
-    const rankings = this.rankings[level] || [];
-    let html = '';
-    if (rankings.length === 0) {
-      html = '<p style="text-align: center; color: #94a3b8;">まだランキングはありません</p>';
-    } else {
-      rankings.forEach((entry, i) => {
-        html += `
-          <div class="ranking-item">
-            <span class="rank">#${i + 1}</span>
-            <div style="flex: 1;">
-              <div style="font-weight: bold;">${entry.studentId}</div>
-              <div style="font-size: 12px; color: #94a3b8;">${entry.accuracy}% 正答</div>
-            </div>
-            <span class="score">${entry.score}</span>
-          </div>
-        `;
-      });
-    }
-    document.getElementById('rankingList').innerHTML = html;
-  },
-
-  checkAdminPassword() {
-    const input = document.getElementById('adminPasswordInput').value;
-    if (input === ADMIN_PASSWORD) {
-      document.getElementById('adminPasswordInput').value = '';
-      document.getElementById('adminError').textContent = '';
-      this.goAdminPanel();
-    } else {
-      document.getElementById('adminError').textContent = 'パスワードが正しくありません';
-    }
-  },
-
-  addWord() {
-    const eng = document.getElementById('manualEnglish').value.trim();
-    const jpn = document.getElementById('manualJapanese').value.trim();
-    const level = document.getElementById('adminLevel').value;
-    if (!eng || !jpn) return;
-    this.allWords.push({english: eng, japanese: jpn, level: level});
-    window.vocabApp.set('vocab-words', this.allWords, true);
-    document.getElementById('manualEnglish').value = '';
-    document.getElementById('manualJapanese').value = '';
-    this.updateWordList();
-  },
-
-  updateWordList() {
-    const level = document.getElementById('adminLevel').value;
-    const words = this.allWords.filter(w => w.level === level);
-    let html = '';
-    words.forEach((w, i) => {
-      html += `<div style="padding: 6px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between;"><span>${w.english} - ${w.japanese}</span><button class="btn btn-dark" style="padding: 4px 8px; font-size: 12px;" onclick="app.deleteWord(${i})">削除</button></div>`;
-    });
-    document.getElementById('wordList').innerHTML = html;
-  },
-
-  deleteWord(index) {
-    const level = document.getElementById('adminLevel').value;
-    this.allWords = this.allWords.filter((w, i) => !(w.level === level && this.allWords.filter(x => x.level === level).indexOf(w) === i));
-    window.vocabApp.set('vocab-words', this.allWords, true);
-    this.updateWordList();
-  },
-
-  issueStudentIds() {
-    const year = document.getElementById('issueYear').value;
-    const count = parseInt(document.getElementById('issueCount').value) || 1;
-    const ids = [];
-    for (let i = 0; i < count; i++) {
-      const id = 'ID' + year + Math.random().toString(36).substr(2, 8).toUpperCase();
-      ids.push(id);
-      this.allStudentIds.push(id);
-    }
-    window.vocabApp.set('student-ids', this.allStudentIds, true);
-    document.getElementById('issuedIds').innerHTML = '<strong>発行したID:</strong><br>' + ids.join('<br>');
-  },
-
-  async savePlayPassword() {
-    const pw = document.getElementById('playPasswordAdmin').value;
-    if (!pw) return;
-    this.playPassword = pw;
-    await window.vocabApp.set('play-password', pw, true);
-    document.getElementById('playPasswordAdmin').value = '';
-    alert('保存しました');
-  }
+  studentId: null,
+  profile: null,
+  selectedLevel: null,
+  setupFace: FACE_OPTIONS[0],
+  game: null,
+  rankingLevel: '中1'
 };
 
-// 初期化
-new Promise(resolve => {
-  const checkReady = () => {
-    if (window.firebaseReady) { app.init(); resolve(); }
-    else setTimeout(checkReady, 100);
+function $(id) { return document.getElementById(id); }
+
+function showScreen(id) {
+  var screens = document.querySelectorAll('[id^="screen-"]');
+  for (var i = 0; i < screens.length; i++) screens[i].classList.add('hidden');
+  var target = $(id);
+  if (target) target.classList.remove('hidden');
+}
+
+function getMonthKey() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function getCurrentYearOptions() {
+  var y = new Date().getFullYear();
+  var years = [];
+  for (var i = y + 1; i >= y - 3; i--) years.push(i);
+  return years;
+}
+
+/* ---------- データ読み込み ---------- */
+async function loadAllData() {
+  var words = await window.__fb.dbGet('vocab-words', true);
+  if (words && Array.isArray(words) && words.length) state.allWords = words;
+
+  var pw = await window.__fb.dbGet('play-password', true);
+  if (pw) state.playPassword = pw;
+
+  var ids = await window.__fb.dbGet('student-ids', true);
+  if (ids && Array.isArray(ids)) state.studentIds = ids;
+
+  var ranks = await window.__fb.dbGet('rankings', true);
+  if (ranks) state.rankings = ranks;
+}
+
+/* ---------- 初期化 ---------- */
+async function initApp() {
+  await loadAllData();
+  populateYearSelects();
+  populateFaceOptions();
+  populateAdminLevelSelect();
+  showScreen('screen-home');
+}
+
+function populateYearSelects() {
+  var years = getCurrentYearOptions();
+  var setupSel = $('input-setup-year');
+  var issueSel = $('admin-issue-year');
+  setupSel.innerHTML = '';
+  issueSel.innerHTML = '';
+  years.forEach(function(y) {
+    var o1 = document.createElement('option');
+    o1.value = y; o1.textContent = y + '年度';
+    setupSel.appendChild(o1);
+    var o2 = document.createElement('option');
+    o2.value = y; o2.textContent = y + '年度';
+    issueSel.appendChild(o2);
+  });
+}
+
+function populateFaceOptions() {
+  var box = $('face-options');
+  box.innerHTML = '';
+  FACE_OPTIONS.forEach(function(f) {
+    var btn = document.createElement('button');
+    btn.textContent = f;
+    btn.className = 'btn';
+    btn.style.fontSize = '28px';
+    btn.style.padding = '10px';
+    btn.style.background = (f === state.setupFace) ? '#8b5cf6' : '#1e293b';
+    btn.onclick = function() {
+      state.setupFace = f;
+      populateFaceOptions();
+    };
+    box.appendChild(btn);
+  });
+}
+
+function populateAdminLevelSelect() {
+  var sel = $('admin-level-select');
+  sel.innerHTML = '';
+  LEVELS.forEach(function(lv) {
+    var o = document.createElement('option');
+    o.value = lv; o.textContent = lv;
+    sel.appendChild(o);
+  });
+  sel.onchange = renderAdminWordList;
+  renderAdminWordList();
+}
+
+/* ---------- 画面遷移 ---------- */
+function goHome() { showScreen('screen-home'); }
+
+function goPlayPasswordGate() {
+  $('input-playpw').value = '';
+  $('error-playpw').textContent = '';
+  showScreen('screen-playpw');
+  $('input-playpw').focus();
+}
+
+function goStudentIdGate() {
+  $('input-studentid').value = '';
+  $('error-studentid').textContent = '';
+  showScreen('screen-studentid');
+  $('input-studentid').focus();
+}
+
+function goLevelSelect() { showScreen('screen-levelselect'); }
+
+async function goRanking() {
+  showScreen('screen-ranking');
+  setRankingLevel(state.rankingLevel);
+}
+
+function goAdminLogin() {
+  $('input-adminpw').value = '';
+  $('error-adminpw').textContent = '';
+  showScreen('screen-adminlogin');
+  $('input-adminpw').focus();
+}
+
+function goAdminPanel() {
+  populateAdminLevelSelect();
+  showScreen('screen-adminpanel');
+}
+
+/* ---------- 認証 ---------- */
+function submitPlayPassword() {
+  var val = $('input-playpw').value;
+  if (val === state.playPassword) {
+    goStudentIdGate();
+  } else {
+    $('error-playpw').textContent = '合言葉が正しくありません';
+  }
+}
+
+async function submitStudentId() {
+  var val = $('input-studentid').value.trim().toUpperCase();
+  if (!val) return;
+  if (state.studentIds.indexOf(val) === -1) {
+    $('error-studentid').textContent = 'そのIDは登録されていません';
+    return;
+  }
+  state.studentId = val;
+  showScreen('screen-loading');
+
+  var profile = await window.__fb.dbGet('profile-' + val, true);
+  if (profile) {
+    state.profile = profile;
+    goLevelSelect();
+  } else {
+    $('profilesetup-id').textContent = 'ID: ' + val;
+    state.setupFace = FACE_OPTIONS[0];
+    populateFaceOptions();
+    showScreen('screen-profilesetup');
+  }
+}
+
+async function confirmProfileSetup() {
+  var name = $('input-setup-name').value.trim();
+  if (!name) return;
+  var year = parseInt($('input-setup-year').value, 10);
+  var profile = {
+    studentId: state.studentId,
+    name: name,
+    enrollYear: year,
+    face: state.setupFace,
+    totalScore: 0
   };
-  checkReady();
-});
+  state.profile = profile;
+  await window.__fb.dbSet('profile-' + state.studentId, profile, true);
+  goLevelSelect();
+}
+
+/* ---------- ゲームロジック ---------- */
+function startGameForLevel(level) {
+  state.selectedLevel = level;
+  var countdown = 3;
+  $('countdown-num').textContent = countdown;
+  showScreen('screen-countdown');
+  var timer = setInterval(function() {
+    countdown -= 1;
+    if (countdown <= 0) {
+      clearInterval(timer);
+      beginGame();
+    } else {
+      $('countdown-num').textContent = countdown;
+    }
+  }, 700);
+}
+
+function shuffleArray(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+function beginGame() {
+  var pool = state.allWords.filter(function(w) { return w.level === state.selectedLevel; });
+  if (pool.length === 0) pool = DEFAULT_WORDS.filter(function(w) { return w.level === state.selectedLevel; });
+  var shuffled = shuffleArray(pool);
+
+  state.game = {
+    queue: shuffled,
+    index: 0,
+    score: 0,
+    correct: 0,
+    attempted: 0,
+    combo: 0,
+    maxCombo: 0,
+    timeLeft: 60,
+    timerId: null
+  };
+
+  $('game-score').textContent = '0';
+  $('game-time').textContent = '60';
+  $('game-correct').textContent = '0';
+  $('game-attempted').textContent = '0';
+  $('game-input').value = '';
+  showCurrentWord();
+  showScreen('screen-game');
+  $('game-input').focus();
+
+  state.game.timerId = setInterval(gameTick, 1000);
+}
+
+function showCurrentWord() {
+  var g = state.game;
+  if (!g) return;
+  if (g.index >= g.queue.length) {
+    g.queue = g.queue.concat(shuffleArray(g.queue));
+  }
+  var word = g.queue[g.index];
+  $('game-japanese').textContent = word ? word.japanese : '';
+}
+
+function gameTick() {
+  var g = state.game;
+  if (!g) return;
+  g.timeLeft -= 1;
+  $('game-time').textContent = g.timeLeft;
+  if (g.timeLeft <= 0) {
+    clearInterval(g.timerId);
+    endGame();
+  }
+}
+
+function getComboMultiplier(c) {
+  if (c >= 10) return 3;
+  if (c >= 5) return 2;
+  if (c >= 3) return 1.5;
+  return 1;
+}
+
+function submitGameAnswer() {
+  var g = state.game;
+  if (!g) return;
+  var input = $('game-input').value.trim();
+  if (!input) return;
+  var word = g.queue[g.index];
+  if (!word) return;
+
+  g.attempted += 1;
+  var correct = input.toLowerCase() === word.english.toLowerCase();
+
+  var box = $('game-word-box');
+  if (correct) {
+    g.combo += 1;
+    var mult = getComboMultiplier(g.combo);
+    var pts = Math.round(10 * mult);
+    g.score += pts;
+    g.correct += 1;
+    g.maxCombo = Math.max(g.maxCombo, g.combo);
+    box.style.background = '#052e1a';
+  } else {
+    g.combo = 0;
+    box.style.background = '#450a0a';
+  }
+
+  $('game-score').textContent = g.score;
+  $('game-correct').textContent = g.correct;
+  $('game-attempted').textContent = g.attempted;
+  $('game-input').value = '';
+
+  g.index += 1;
+
+  setTimeout(function() {
+    box.style.background = '#0f172a';
+    if (state.game) {
+      showCurrentWord();
+      $('game-input').focus();
+    }
+  }, 300);
+}
+
+function abandonGame() {
+  if (state.game && state.game.timerId) clearInterval(state.game.timerId);
+  state.game = null;
+  goHome();
+}
+
+async function endGame() {
+  var g = state.game;
+  if (!g) return;
+  var accuracy = g.attempted > 0 ? Math.round((g.correct / g.attempted) * 100) : 0;
+
+  $('result-score').textContent = g.score;
+  $('result-correct').textContent = g.correct + ' / ' + g.attempted;
+  $('result-combo').textContent = g.maxCombo;
+  $('result-accuracy').textContent = accuracy + '%';
+
+  // ランキング保存
+  var level = state.selectedLevel;
+  var mk = getMonthKey();
+  if (!state.rankings[level]) state.rankings[level] = { monthly: [], monthKey: mk };
+  if (state.rankings[level].monthKey !== mk) {
+    state.rankings[level].monthly = [];
+    state.rankings[level].monthKey = mk;
+  }
+  var entry = {
+    studentId: state.studentId,
+    name: state.profile ? state.profile.name : state.studentId,
+    score: g.score,
+    correct: g.correct,
+    attempted: g.attempted,
+    accuracy: accuracy,
+    maxCombo: g.maxCombo,
+    date: new Date().toISOString()
+  };
+  state.rankings[level].monthly = state.rankings[level].monthly
+    .filter(function(e) { return e.studentId !== entry.studentId; })
+    .concat(entry)
+    .sort(function(a, b) { return b.score - a.score; })
+    .slice(0, 20);
+
+  await window.__fb.dbSet('rankings', state.rankings, true);
+
+  if (state.profile) {
+    state.profile.totalScore = (state.profile.totalScore || 0) + g.score;
+    await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  }
+
+  state.game = null;
+  showScreen('screen-result');
+}
+
+/* ---------- ランキング表示 ---------- */
+function setRankingLevel(level) {
+  state.rankingLevel = level;
+  var tabs = document.querySelectorAll('#ranking-level-tabs .tab-btn');
+  tabs.forEach(function(t) {
+    t.classList.toggle('active', t.getAttribute('data-level') === level);
+  });
+  renderRankingList();
+}
+
+function renderRankingList() {
+  var listEl = $('ranking-list');
+  var data = state.rankings[state.rankingLevel];
+  var monthly = (data && data.monthly) ? data.monthly : [];
+  if (monthly.length === 0) {
+    listEl.innerHTML = '<p style="text-align:center; color:#94a3b8;">まだ記録がありません</p>';
+    return;
+  }
+  var html = '';
+  monthly.forEach(function(entry, i) {
+    html += '<div class="ranking-item">' +
+      '<span class="rank-num">#' + (i + 1) + '</span>' +
+      '<div style="flex:1; padding:0 10px;">' +
+        '<div style="font-weight:bold;">' + escapeHtml(entry.name) + '</div>' +
+        '<div style="font-size:11px; color:#94a3b8;">正答率 ' + entry.accuracy + '%　最大コンボ ' + entry.maxCombo + '</div>' +
+      '</div>' +
+      '<span class="score-val">' + entry.score + '</span>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ---------- 管理者 ---------- */
+function submitAdminPassword() {
+  var val = $('input-adminpw').value;
+  if (val === ADMIN_PASSWORD) {
+    goAdminPanel();
+  } else {
+    $('error-adminpw').textContent = 'パスワードが正しくありません';
+  }
+}
+
+function renderAdminWordList() {
+  var level = $('admin-level-select').value;
+  var words = state.allWords.filter(function(w) { return w.level === level; });
+  var listEl = $('admin-word-list');
+  if (words.length === 0) {
+    listEl.innerHTML = '<p style="color:#94a3b8; text-align:center; margin:0;">単語がありません</p>';
+    return;
+  }
+  var html = '';
+  words.forEach(function(w) {
+    html += '<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #334155;">' +
+      '<span>' + escapeHtml(w.english) + ' - ' + escapeHtml(w.japanese) + '</span>' +
+      '<button class="admin-delete-word-btn" data-english="' + escapeHtml(w.english) + '" data-level="' + escapeHtml(w.level) + '" style="background:none; border:none; color:#f87171; cursor:pointer; font-size:13px;">削除</button>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+
+  var delBtns = listEl.querySelectorAll('.admin-delete-word-btn');
+  delBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      var eng = btn.getAttribute('data-english');
+      var lvl = btn.getAttribute('data-level');
+      deleteWord(eng, lvl);
+    };
+  });
+}
+
+async function addWord() {
+  var eng = $('admin-word-en').value.trim();
+  var jpn = $('admin-word-jp').value.trim();
+  var level = $('admin-level-select').value;
+  if (!eng || !jpn) return;
+  state.allWords.push({ english: eng, japanese: jpn, level: level });
+  await window.__fb.dbSet('vocab-words', state.allWords, true);
+  $('admin-word-en').value = '';
+  $('admin-word-jp').value = '';
+  renderAdminWordList();
+}
+
+async function deleteWord(eng, level) {
+  state.allWords = state.allWords.filter(function(w) {
+    return !(w.english === eng && w.level === level);
+  });
+  await window.__fb.dbSet('vocab-words', state.allWords, true);
+  renderAdminWordList();
+}
+
+function generateRandomId() {
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var id = '';
+  for (var i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
+
+async function issueStudentIds() {
+  var count = parseInt($('admin-issue-count').value, 10) || 1;
+  count = Math.max(1, Math.min(100, count));
+  var existing = {};
+  state.studentIds.forEach(function(id) { existing[id] = true; });
+  var newIds = [];
+  while (newIds.length < count) {
+    var id = generateRandomId();
+    if (existing[id]) continue;
+    existing[id] = true;
+    newIds.push(id);
+    state.studentIds.push(id);
+  }
+  await window.__fb.dbSet('student-ids', state.studentIds, true);
+  $('admin-issued-list').innerHTML = '<strong>発行したID:</strong><br>' + newIds.join('<br>');
+}
+
+async function saveAdminPlayPassword() {
+  var pw = $('admin-playpw-input').value.trim();
+  if (!pw) return;
+  state.playPassword = pw;
+  await window.__fb.dbSet('play-password', pw, true);
+  $('admin-playpw-input').value = '';
+  var msg = $('admin-save-msg');
+  msg.textContent = '保存しました！';
+  setTimeout(function() { msg.textContent = ''; }, 2000);
+}
+
+/* ---------- イベントリスナー登録 ---------- */
+function wireUpEvents() {
+  $('btn-battle-start').onclick = goPlayPasswordGate;
+  $('btn-show-ranking').onclick = goRanking;
+  $('btn-admin-login').onclick = goAdminLogin;
+
+  $('btn-playpw-submit').onclick = submitPlayPassword;
+  $('btn-playpw-back').onclick = goHome;
+  $('input-playpw').onkeydown = function(e) { if (e.key === 'Enter') submitPlayPassword(); };
+
+  $('btn-studentid-submit').onclick = submitStudentId;
+  $('btn-studentid-back').onclick = goHome;
+  $('input-studentid').onkeydown = function(e) { if (e.key === 'Enter') submitStudentId(); };
+
+  $('btn-profilesetup-confirm').onclick = confirmProfileSetup;
+
+  var levelBtns = document.querySelectorAll('.level-btn');
+  levelBtns.forEach(function(btn) {
+    btn.onclick = function() { startGameForLevel(btn.getAttribute('data-level')); };
+  });
+  $('btn-levelselect-back').onclick = goHome;
+
+  $('btn-game-submit').onclick = submitGameAnswer;
+  $('game-input').onkeydown = function(e) { if (e.key === 'Enter') submitGameAnswer(); };
+  $('btn-game-abandon').onclick = abandonGame;
+
+  $('btn-result-retry').onclick = goLevelSelect;
+  $('btn-result-ranking').onclick = goRanking;
+  $('btn-result-home').onclick = goHome;
+
+  var rankTabs = document.querySelectorAll('#ranking-level-tabs .tab-btn');
+  rankTabs.forEach(function(tab) {
+    tab.onclick = function() { setRankingLevel(tab.getAttribute('data-level')); };
+  });
+  $('btn-ranking-back').onclick = goHome;
+
+  $('btn-adminlogin-submit').onclick = submitAdminPassword;
+  $('btn-adminlogin-back').onclick = goHome;
+  $('input-adminpw').onkeydown = function(e) { if (e.key === 'Enter') submitAdminPassword(); };
+
+  $('btn-admin-add-word').onclick = addWord;
+  $('btn-admin-issue-ids').onclick = issueStudentIds;
+  $('btn-admin-save-playpw').onclick = saveAdminPlayPassword;
+  $('btn-adminpanel-home').onclick = goHome;
+}
+
+/* ---------- 起動 ---------- */
+function boot() {
+  wireUpEvents();
+  if (window.__fbReady) {
+    initApp();
+  } else {
+    window.addEventListener('fb-ready', initApp, { once: true });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
 </script>
 
 </body>
