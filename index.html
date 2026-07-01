@@ -51,6 +51,7 @@
     <h2 class="center" style="margin-top:0;">ホーム</h2>
     <button class="btn btn-primary" id="btn-battle-start">バトル開始</button>
     <button class="btn btn-dark" id="btn-show-ranking">ランキング</button>
+    <button class="btn btn-dark" id="btn-show-titles">🏅 称号</button>
     <button class="btn btn-dark" id="btn-admin-login">管理者</button>
   </div>
 
@@ -127,6 +128,7 @@
       <div class="stat-box"><div class="val" id="result-combo" style="color:#fb923c;">0</div><div class="label">Max Combo</div></div>
       <div class="stat-box"><div class="val" id="result-accuracy" style="color:#34d399;">0%</div><div class="label">Accuracy</div></div>
     </div>
+    <div id="result-new-titles"></div>
     <button class="btn btn-primary" id="btn-result-retry" style="margin-top:16px;">別のレベルへ</button>
     <button class="btn btn-dark" id="btn-result-ranking">ランキングを見る</button>
     <button class="btn btn-dark" id="btn-result-home">ホームへ</button>
@@ -143,6 +145,17 @@
     </div>
     <div id="ranking-list" style="max-height:400px; overflow-y:auto;"></div>
     <button class="btn btn-dark" id="btn-ranking-back" style="margin-top:16px;">戻る</button>
+  </div>
+
+  <!-- TITLES -->
+  <div id="screen-titles" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🏅 称号</h2>
+    <p class="center" style="font-size:12px; color:#94a3b8;">獲得数: <span id="titles-earned-count">0</span> / <span id="titles-total-count">0</span></p>
+    <p style="font-size:12px; color:#94a3b8;">表示する称号を最大3つまで選択できます(タップで選択/解除)</p>
+    <div id="titles-list" style="max-height:400px; overflow-y:auto;"></div>
+    <p class="center" id="titles-save-msg" style="color:#34d399; font-size:13px; min-height:18px;"></p>
+    <button class="btn btn-primary" id="btn-titles-save">保存</button>
+    <button class="btn btn-dark" id="btn-titles-back">戻る</button>
   </div>
 
   <!-- ADMIN LOGIN -->
@@ -298,7 +311,8 @@ var state = {
   setupFace: FACE_OPTIONS[0],
   game: null,
   rankingLevel: '中1',
-  adminAuthHash: null
+  adminAuthHash: null,
+  titleSelection: []
 };
 
 function $(id) { return document.getElementById(id); }
@@ -319,6 +333,7 @@ function ensureStats(profile) {
       bestAccuracy: 0,
       bestCombo: 0,
       exactScoresSeen: [],
+      exactAccuracySeen: [],
       earlyBird: false,
       nightOwl: false,
       levelsPlayed: [],
@@ -328,7 +343,78 @@ function ensureStats(profile) {
       mistakesResolved: 0
     };
   }
+  // フィールド単位の後方互換マイグレーション(stats自体は存在するが新フィールドが無いケース)
+  if (!profile.stats.exactAccuracySeen) profile.stats.exactAccuracySeen = [];
+  if (!profile.earnedTitleKeys) profile.earnedTitleKeys = [];
+  if (!profile.displayedTitleKeys) profile.displayedTitleKeys = [];
+  if (typeof profile.streakDays !== 'number') profile.streakDays = 0;
+  if (typeof profile.bestStreakDays !== 'number') profile.bestStreakDays = 0;
+  if (profile.lastPlayDate === undefined) profile.lastPlayDate = null;
   return profile.stats;
+}
+
+/* ---------- Stage 3-2: 称号システム ---------- */
+// implemented:false の称号は判定に必要なデータ(連続ログイン・練習モード・苦手単語)が
+// まだ実装されていないため、常にfalseを返す(将来のStageで有効化する)。
+var TITLES = [
+  // スコア系
+  { id:'beginner', name:'英単語ビギナー', category:'スコア', desc:'0pt', implemented:true, check:function(p){ return p.totalScore >= 0; } },
+  { id:'apprentice', name:'見習いタイピスト', category:'スコア', desc:'50pt', implemented:true, check:function(p){ return p.totalScore >= 50; } },
+  { id:'hunter', name:'単語ハンター', category:'スコア', desc:'150pt', implemented:true, check:function(p){ return p.totalScore >= 150; } },
+  { id:'skilled', name:'スキルドタイパー', category:'スコア', desc:'300pt', implemented:true, check:function(p){ return p.totalScore >= 300; } },
+  { id:'fastTyper', name:'高速入力士', category:'スコア', desc:'500pt', implemented:true, check:function(p){ return p.totalScore >= 500; } },
+  { id:'wordsmith', name:'ワードスミス', category:'スコア', desc:'800pt', implemented:true, check:function(p){ return p.totalScore >= 800; } },
+  { id:'expert', name:'英単語エキスパート', category:'スコア', desc:'1200pt', implemented:true, check:function(p){ return p.totalScore >= 1200; } },
+  { id:'master', name:'タイピングマスター', category:'スコア', desc:'1800pt', implemented:true, check:function(p){ return p.totalScore >= 1800; } },
+  { id:'champion', name:'チャンピオン', category:'スコア', desc:'2500pt', implemented:true, check:function(p){ return p.totalScore >= 2500; } },
+  { id:'genius', name:'英語の天才', category:'スコア', desc:'3500pt', implemented:true, check:function(p){ return p.totalScore >= 3500; } },
+  { id:'legend', name:'伝説のタイピスト', category:'スコア', desc:'5000pt', implemented:true, check:function(p){ return p.totalScore >= 5000; } },
+  { id:'grandmaster', name:'グランドマスター', category:'スコア', desc:'7000pt', implemented:true, check:function(p){ return p.totalScore >= 7000; } },
+  { id:'godhand', name:'神の手', category:'スコア', desc:'10000pt', implemented:true, check:function(p){ return p.totalScore >= 10000; } },
+  // 正答率系
+  { id:'accurateEgg', name:'正確無比の卵', category:'正答率', desc:'正答率70%', implemented:true, check:function(p){ return p.stats.bestAccuracy >= 70; } },
+  { id:'sharpshooter', name:'シャープシューター', category:'正答率', desc:'正答率85%', implemented:true, check:function(p){ return p.stats.bestAccuracy >= 85; } },
+  { id:'mrPerfect', name:'ミスター・パーフェクト', category:'正答率', desc:'正答率95%', implemented:true, check:function(p){ return p.stats.bestAccuracy >= 95; } },
+  { id:'flawless', name:'完全無欠', category:'正答率', desc:'正答率100%', implemented:true, check:function(p){ return p.stats.bestAccuracy >= 100; } },
+  // コンボ系
+  { id:'comboBreakerReserve', name:'コンボブレイカー予備軍', category:'コンボ', desc:'コンボ10', implemented:true, check:function(p){ return p.stats.bestCombo >= 10; } },
+  { id:'comboKing', name:'コンボキング', category:'コンボ', desc:'コンボ20', implemented:true, check:function(p){ return p.stats.bestCombo >= 20; } },
+  { id:'renkeki', name:'連撃の覇者', category:'コンボ', desc:'コンボ30', implemented:true, check:function(p){ return p.stats.bestCombo >= 30; } },
+  { id:'infiniteCombo', name:'無限コンボ使い', category:'コンボ', desc:'コンボ50', implemented:true, check:function(p){ return p.stats.bestCombo >= 50; } },
+  // 特殊系(実装済み)
+  { id:'lucky777', name:'ラッキー777', category:'特殊', desc:'スコア777pt達成', implemented:true, check:function(p){ return p.stats.exactScoresSeen.indexOf(777) !== -1; } },
+  { id:'sevens', name:'セブンズ', category:'特殊', desc:'正答率77%達成', implemented:true, check:function(p){ return p.stats.exactAccuracySeen.indexOf(77) !== -1; } },
+  { id:'earlyBirdTitle', name:'早起きは三文の徳', category:'特殊', desc:'朝6時-8時にプレイ', implemented:true, check:function(p){ return p.stats.earlyBird === true; } },
+  { id:'nightOwlTitle', name:'夜更かし英語マスター', category:'特殊', desc:'夜23時以降にプレイ', implemented:true, check:function(p){ return p.stats.nightOwl === true; } },
+  { id:'allLevels', name:'全レベル制覇', category:'特殊', desc:'全4レベルをプレイ', implemented:true, check:function(p){ return p.stats.levelsPlayed.length >= 4; } },
+  { id:'comebackSpirit', name:'カムバック魂', category:'特殊', desc:'不正解後コンボ20以上に再到達', implemented:true, check:function(p){ return p.stats.comeback === true; } },
+  // 特殊系(練習モード・苦手単語トラッキング実装後に有効化)
+  { id:'doryokuka', name:'努力家', category:'特殊', desc:'練習モード10回(未実装)', implemented:false, check:function(){ return false; } },
+  { id:'tanren', name:'鍛錬の達人', category:'特殊', desc:'練習モード50回(未実装)', implemented:false, check:function(){ return false; } },
+  { id:'jakutenKokufuku', name:'弱点克服者', category:'特殊', desc:'練習で累計100問正解(未実装)', implemented:false, check:function(){ return false; } },
+  { id:'revenger', name:'リベンジャー', category:'特殊', desc:'苦手単語20個克服(未実装)', implemented:false, check:function(){ return false; } },
+  // 連続系(プレイ連続日数。ログインのみでは加算されず、ゲーム完走時にのみカウント)
+  { id:'streak3', name:'三日坊主クリア', category:'連続', desc:'3日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 3; } },
+  { id:'streak7', name:'週間戦士', category:'連続', desc:'7日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 7; } },
+  { id:'streak14', name:'デディケーター', category:'連続', desc:'14日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 14; } },
+  { id:'streak30', name:'不屈の意志', category:'連続', desc:'30日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 30; } },
+  { id:'streak50', name:'半世紀の偉業', category:'連続', desc:'50日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 50; } },
+  { id:'streak60', name:'鉄人タイパー', category:'連続', desc:'60日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 60; } },
+  { id:'streak100', name:'伝説の継続者', category:'連続', desc:'100日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 100; } }
+];
+
+function updateEarnedTitles(profile) {
+  ensureStats(profile);
+  var newly = [];
+  TITLES.forEach(function(t) {
+    if (!t.implemented) return;
+    if (profile.earnedTitleKeys.indexOf(t.id) !== -1) return;
+    if (t.check(profile)) {
+      profile.earnedTitleKeys.push(t.id);
+      newly.push(t);
+    }
+  });
+  return newly;
 }
 
 function showScreen(id) {
@@ -341,6 +427,28 @@ function showScreen(id) {
 function getMonthKey() {
   var d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function getDateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// ストリーク(連続プレイ日数)の更新。
+// 「ログインしただけ」では呼ばれず、1ゲームを完走した(endGame)時にのみ呼び出すこと。
+// 同日中に何度プレイしても2回目以降はカウントしない。
+function updatePlayStreak(profile) {
+  var today = getDateKey(new Date());
+  if (profile.lastPlayDate === today) {
+    return; // 本日分は既にカウント済み
+  }
+  var yesterday = getDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  if (profile.lastPlayDate === yesterday) {
+    profile.streakDays += 1;
+  } else {
+    profile.streakDays = 1; // 前日プレイしていない(または初回) → リセットして1からカウント
+  }
+  profile.lastPlayDate = today;
+  profile.bestStreakDays = Math.max(profile.bestStreakDays, profile.streakDays);
 }
 
 function getCurrentYearOptions() {
@@ -684,6 +792,9 @@ async function endGame() {
     if (g.score === 777 && stats.exactScoresSeen.indexOf(777) === -1) {
       stats.exactScoresSeen.push(777);
     }
+    if (accuracy === 77 && stats.exactAccuracySeen.indexOf(77) === -1) {
+      stats.exactAccuracySeen.push(77);
+    }
     if (hour >= 6 && hour < 8) stats.earlyBird = true;
     if (hour >= 23) stats.nightOwl = true;
     if (stats.levelsPlayed.indexOf(level) === -1) stats.levelsPlayed.push(level);
@@ -691,7 +802,15 @@ async function endGame() {
 
     state.profile.totalScore = (state.profile.totalScore || 0) + g.score;
     stats.totalScore = state.profile.totalScore;
+
+    updatePlayStreak(state.profile);
+
+    var newlyEarnedTitles = updateEarnedTitles(state.profile);
+    renderResultNewTitles(newlyEarnedTitles);
+
     await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  } else {
+    renderResultNewTitles([]);
   }
 
   state.game = null;
@@ -734,6 +853,94 @@ function escapeHtml(str) {
   var div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+/* ---------- Stage 3-2: 称号システム 画面ロジック ---------- */
+function renderResultNewTitles(newlyEarnedTitles) {
+  var box = $('result-new-titles');
+  if (!box) return;
+  if (!newlyEarnedTitles || newlyEarnedTitles.length === 0) {
+    box.innerHTML = '';
+    return;
+  }
+  var html = '<div style="background:#1e293b; border:1px solid #fbbf24; border-radius:8px; padding:12px; text-align:center;">' +
+    '<p style="margin:0 0 6px 0; font-size:12px; color:#fbbf24; font-weight:bold;">🎉 新しい称号を獲得しました！</p>';
+  newlyEarnedTitles.forEach(function(t) {
+    html += '<p style="margin:2px 0; font-weight:bold;">' + escapeHtml(t.name) + '</p>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function goTitles() {
+  if (!state.profile) { goHome(); return; }
+  ensureStats(state.profile);
+  state.titleSelection = (state.profile.displayedTitleKeys || []).slice();
+  showScreen('screen-titles');
+  renderTitlesList();
+}
+
+function renderTitlesList() {
+  var earned = (state.profile && state.profile.earnedTitleKeys) ? state.profile.earnedTitleKeys : [];
+  var implementedTotal = TITLES.filter(function(t) { return t.implemented; }).length;
+  $('titles-earned-count').textContent = earned.length;
+  $('titles-total-count').textContent = implementedTotal;
+
+  var categories = ['スコア', '正答率', 'コンボ', '特殊', '連続'];
+  var html = '';
+  categories.forEach(function(cat) {
+    var inCat = TITLES.filter(function(t) { return t.category === cat; });
+    if (inCat.length === 0) return;
+    html += '<p style="font-size:12px; color:#94a3b8; margin:12px 0 4px 0;">' + escapeHtml(cat) + '系</p>';
+    inCat.forEach(function(t) {
+      var isEarned = earned.indexOf(t.id) !== -1;
+      var isSelected = state.titleSelection.indexOf(t.id) !== -1;
+      if (!t.implemented) {
+        html += '<div class="ranking-item" style="opacity:0.4;">' +
+          '<span>🔒 ' + escapeHtml(t.name) + '</span>' +
+          '<span style="font-size:11px; color:#94a3b8;">' + escapeHtml(t.desc) + '</span>' +
+        '</div>';
+      } else if (isEarned) {
+        html += '<div class="ranking-item title-toggle-btn" data-id="' + t.id + '" style="cursor:pointer; border:2px solid ' + (isSelected ? '#d946ef' : 'transparent') + ';">' +
+          '<span>' + (isSelected ? '✅ ' : '🏅 ') + escapeHtml(t.name) + '</span>' +
+          '<span style="font-size:11px; color:#94a3b8;">' + escapeHtml(t.desc) + '</span>' +
+        '</div>';
+      } else {
+        html += '<div class="ranking-item" style="opacity:0.5;">' +
+          '<span>🔒 ' + escapeHtml(t.name) + '</span>' +
+          '<span style="font-size:11px; color:#94a3b8;">' + escapeHtml(t.desc) + '</span>' +
+        '</div>';
+      }
+    });
+  });
+  $('titles-list').innerHTML = html;
+
+  var toggleBtns = document.querySelectorAll('.title-toggle-btn');
+  toggleBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      var id = btn.getAttribute('data-id');
+      var idx = state.titleSelection.indexOf(id);
+      if (idx !== -1) {
+        state.titleSelection.splice(idx, 1);
+      } else {
+        if (state.titleSelection.length >= 3) {
+          $('titles-save-msg').textContent = '表示できる称号は最大3つまでです';
+          setTimeout(function() { $('titles-save-msg').textContent = ''; }, 1800);
+          return;
+        }
+        state.titleSelection.push(id);
+      }
+      renderTitlesList();
+    };
+  });
+}
+
+async function saveTitles() {
+  if (!state.profile) return;
+  state.profile.displayedTitleKeys = state.titleSelection.slice(0, 3);
+  await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  $('titles-save-msg').textContent = '保存しました！';
+  setTimeout(function() { $('titles-save-msg').textContent = ''; }, 1800);
 }
 
 /* ---------- 管理者 ---------- */
@@ -834,6 +1041,7 @@ async function saveAdminPlayPassword() {
 function wireUpEvents() {
   $('btn-battle-start').onclick = goPlayPasswordGate;
   $('btn-show-ranking').onclick = goRanking;
+  $('btn-show-titles').onclick = goTitles;
   $('btn-admin-login').onclick = goAdminLogin;
 
   $('btn-playpw-submit').onclick = submitPlayPassword;
@@ -865,6 +1073,9 @@ function wireUpEvents() {
     tab.onclick = function() { setRankingLevel(tab.getAttribute('data-level')); };
   });
   $('btn-ranking-back').onclick = goHome;
+
+  $('btn-titles-save').onclick = saveTitles;
+  $('btn-titles-back').onclick = goHome;
 
   $('btn-adminlogin-submit').onclick = submitAdminPassword;
   $('btn-adminlogin-back').onclick = goHome;
