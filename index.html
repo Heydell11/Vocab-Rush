@@ -52,6 +52,7 @@
     <button class="btn btn-primary" id="btn-battle-start">バトル開始</button>
     <button class="btn btn-dark" id="btn-show-ranking">ランキング</button>
     <button class="btn btn-dark" id="btn-show-titles">🏅 称号</button>
+    <button class="btn btn-dark" id="btn-show-rewards">🎁 リワード</button>
     <button class="btn btn-dark" id="btn-admin-login">管理者</button>
   </div>
 
@@ -156,6 +157,18 @@
     <p class="center" id="titles-save-msg" style="color:#34d399; font-size:13px; min-height:18px;"></p>
     <button class="btn btn-primary" id="btn-titles-save">保存</button>
     <button class="btn btn-dark" id="btn-titles-back">戻る</button>
+  </div>
+
+  <!-- REWARDS -->
+  <div id="screen-rewards" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🎁 リワード</h2>
+    <p style="font-size:12px; color:#94a3b8; margin-bottom:4px;">アバター(タップで選択)</p>
+    <div id="rewards-face-list" style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px;"></div>
+    <p style="font-size:12px; color:#94a3b8; margin:16px 0 4px 0;">カラー(タップで選択)</p>
+    <div id="rewards-color-list" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;"></div>
+    <p class="center" id="rewards-save-msg" style="color:#34d399; font-size:13px; min-height:18px; margin-top:12px;"></p>
+    <button class="btn btn-primary" id="btn-rewards-save">保存</button>
+    <button class="btn btn-dark" id="btn-rewards-back">戻る</button>
   </div>
 
   <!-- ADMIN LOGIN -->
@@ -350,6 +363,9 @@ function ensureStats(profile) {
   if (typeof profile.streakDays !== 'number') profile.streakDays = 0;
   if (typeof profile.bestStreakDays !== 'number') profile.bestStreakDays = 0;
   if (profile.lastPlayDate === undefined) profile.lastPlayDate = null;
+  if (!profile.color) profile.color = 'blue';
+  if (!profile.unlockedRewardFaces) profile.unlockedRewardFaces = [];
+  if (!profile.unlockedRewardColors) profile.unlockedRewardColors = [];
   return profile.stats;
 }
 
@@ -415,6 +431,86 @@ function updateEarnedTitles(profile) {
     }
   });
   return newly;
+}
+
+/* ---------- Stage 3-3: リワード(アバター・カラー) ---------- */
+// 注: 元仕様書には「解放20種/8種」という記載がありますが、
+// 実際に列挙されていた絵文字/カラー名はそれぞれ24種・12種でした(数字と実数が不一致)。
+// ここでは実際に列挙されていたリスト(24アバター・12カラー)を正として実装しています。
+//
+// また、元仕様書には「どの称号がどのリワードを解放するか」の対応が定義されていなかったため、
+// 難易度が低い称号から順に対応づける形で仮に設計しました。人間側の意図と異なる場合は
+// unlockTitleId を差し替えるだけで調整できます。
+var BASE_COLORS = [
+  { id:'blue', name:'ブルー', hex:'#3b82f6' },
+  { id:'pink', name:'ピンク', hex:'#ec4899' },
+  { id:'green', name:'グリーン', hex:'#22c55e' },
+  { id:'purple', name:'パープル', hex:'#a855f7' },
+  { id:'orange', name:'オレンジ', hex:'#f97316' }
+];
+
+var REWARD_FACES = [
+  { emoji:'👻', unlockTitleId:'apprentice' },
+  { emoji:'🐹', unlockTitleId:'hunter' },
+  { emoji:'🐔', unlockTitleId:'skilled' },
+  { emoji:'🐧', unlockTitleId:'fastTyper' },
+  { emoji:'🐲', unlockTitleId:'wordsmith' },
+  { emoji:'🐳', unlockTitleId:'expert' },
+  { emoji:'😎', unlockTitleId:'master' },
+  { emoji:'🐉', unlockTitleId:'champion' },
+  { emoji:'🦖', unlockTitleId:'genius' },
+  { emoji:'🐺', unlockTitleId:'legend' },
+  { emoji:'🤖', unlockTitleId:'grandmaster' },
+  { emoji:'🦋', unlockTitleId:'godhand' },
+  { emoji:'🦄', unlockTitleId:'accurateEgg' },
+  { emoji:'🥷', unlockTitleId:'sharpshooter' },
+  { emoji:'🧛', unlockTitleId:'mrPerfect' },
+  { emoji:'🐮', unlockTitleId:'flawless' },
+  { emoji:'🐢', unlockTitleId:'comboBreakerReserve' },
+  { emoji:'🧙', unlockTitleId:'comboKing' },
+  { emoji:'🐨', unlockTitleId:'renkeki' },
+  { emoji:'🦉', unlockTitleId:'infiniteCombo' },
+  { emoji:'🐙', unlockTitleId:'lucky777' },
+  { emoji:'👾', unlockTitleId:'sevens' },
+  { emoji:'😈', unlockTitleId:'earlyBirdTitle' },
+  { emoji:'🦸', unlockTitleId:'nightOwlTitle' }
+];
+
+var REWARD_COLORS = [
+  { id:'yellow', name:'イエロー', hex:'#eab308', unlockTitleId:'allLevels' },
+  { id:'teal', name:'ティール', hex:'#14b8a6', unlockTitleId:'comebackSpirit' },
+  { id:'red', name:'レッド', hex:'#ef4444', unlockTitleId:'doryokuka' },
+  { id:'indigo', name:'インディゴ', hex:'#6366f1', unlockTitleId:'tanren' },
+  { id:'rose', name:'ローズ', hex:'#f43f5e', unlockTitleId:'jakutenKokufuku' },
+  { id:'sakura', name:'サクラ', hex:'#f9a8d4', unlockTitleId:'revenger' },
+  { id:'midnight', name:'ミッドナイト', hex:'#1e293b', unlockTitleId:'streak3' },
+  { id:'lava', name:'ラヴァ', hex:'#dc2626', unlockTitleId:'streak7' },
+  { id:'goldsp', name:'ゴールドSP', hex:'#facc15', unlockTitleId:'streak14' },
+  { id:'neon', name:'ネオン', hex:'#d946ef', unlockTitleId:'streak30' },
+  { id:'imperial', name:'インペリアル', hex:'#7c3aed', unlockTitleId:'streak50' },
+  { id:'rainbow', name:'レインボー', hex:'linear-gradient(90deg,#f87171,#facc15,#4ade80,#38bdf8,#a78bfa)', unlockTitleId:'streak100' }
+];
+
+function updateUnlockedRewards(profile) {
+  if (!profile.unlockedRewardFaces) profile.unlockedRewardFaces = [];
+  if (!profile.unlockedRewardColors) profile.unlockedRewardColors = [];
+  REWARD_FACES.forEach(function(r) {
+    if (profile.earnedTitleKeys.indexOf(r.unlockTitleId) !== -1 && profile.unlockedRewardFaces.indexOf(r.emoji) === -1) {
+      profile.unlockedRewardFaces.push(r.emoji);
+    }
+  });
+  REWARD_COLORS.forEach(function(r) {
+    if (profile.earnedTitleKeys.indexOf(r.unlockTitleId) !== -1 && profile.unlockedRewardColors.indexOf(r.id) === -1) {
+      profile.unlockedRewardColors.push(r.id);
+    }
+  });
+}
+
+function findTitleName(titleId) {
+  for (var i = 0; i < TITLES.length; i++) {
+    if (TITLES[i].id === titleId) return TITLES[i].name;
+  }
+  return titleId;
 }
 
 function showScreen(id) {
@@ -806,6 +902,7 @@ async function endGame() {
     updatePlayStreak(state.profile);
 
     var newlyEarnedTitles = updateEarnedTitles(state.profile);
+    updateUnlockedRewards(state.profile);
     renderResultNewTitles(newlyEarnedTitles);
 
     await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
@@ -943,6 +1040,92 @@ async function saveTitles() {
   setTimeout(function() { $('titles-save-msg').textContent = ''; }, 1800);
 }
 
+/* ---------- Stage 3-3: リワード(アバター・カラー) 画面ロジック ---------- */
+function goRewards() {
+  if (!state.profile) { goHome(); return; }
+  ensureStats(state.profile);
+  state.rewardSelection = {
+    face: state.profile.face,
+    color: state.profile.color || 'blue'
+  };
+  showScreen('screen-rewards');
+  renderRewardsList();
+}
+
+function renderRewardsList() {
+  var unlockedFaces = state.profile.unlockedRewardFaces || [];
+  var unlockedColors = state.profile.unlockedRewardColors || [];
+
+  var faceHtml = '';
+  FACE_OPTIONS.forEach(function(f) {
+    faceHtml += buildRewardFaceButton(f, true, null);
+  });
+  REWARD_FACES.forEach(function(r) {
+    var isUnlocked = unlockedFaces.indexOf(r.emoji) !== -1;
+    faceHtml += buildRewardFaceButton(r.emoji, isUnlocked, r.unlockTitleId);
+  });
+  $('rewards-face-list').innerHTML = faceHtml;
+
+  var colorHtml = '';
+  BASE_COLORS.forEach(function(c) {
+    colorHtml += buildRewardColorButton(c, true, null);
+  });
+  REWARD_COLORS.forEach(function(r) {
+    var isUnlocked = unlockedColors.indexOf(r.id) !== -1;
+    colorHtml += buildRewardColorButton(r, isUnlocked, r.unlockTitleId);
+  });
+  $('rewards-color-list').innerHTML = colorHtml;
+
+  var faceBtns = document.querySelectorAll('.reward-face-btn:not(.locked)');
+  faceBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      state.rewardSelection.face = btn.getAttribute('data-face');
+      renderRewardsList();
+    };
+  });
+  var colorBtns = document.querySelectorAll('.reward-color-btn:not(.locked)');
+  colorBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      state.rewardSelection.color = btn.getAttribute('data-color');
+      renderRewardsList();
+    };
+  });
+}
+
+function buildRewardFaceButton(emoji, unlocked, unlockTitleId) {
+  var isSelected = state.rewardSelection.face === emoji;
+  if (!unlocked) {
+    return '<div class="reward-face-btn locked" style="text-align:center; padding:10px; background:#1e293b; border-radius:8px; opacity:0.35;" title="' + escapeHtml(findTitleName(unlockTitleId)) + '達成で解放">' +
+      '<div style="font-size:22px;">🔒</div>' +
+    '</div>';
+  }
+  return '<button class="reward-face-btn" data-face="' + emoji + '" style="text-align:center; padding:10px; background:#1e293b; border-radius:8px; font-size:22px; border:2px solid ' + (isSelected ? '#d946ef' : 'transparent') + '; cursor:pointer;">' + emoji + '</button>';
+}
+
+function buildRewardColorButton(colorObj, unlocked, unlockTitleId) {
+  var isSelected = state.rewardSelection.color === colorObj.id;
+  var swatchBg = colorObj.hex.indexOf('gradient') !== -1 ? colorObj.hex : colorObj.hex;
+  if (!unlocked) {
+    return '<div class="reward-color-btn locked" style="text-align:center; padding:8px; background:#1e293b; border-radius:8px; opacity:0.35;" title="' + escapeHtml(findTitleName(unlockTitleId)) + '達成で解放">' +
+      '<div style="width:24px; height:24px; border-radius:50%; background:#475569; margin:0 auto 4px auto;"></div>' +
+      '<div style="font-size:10px;">🔒</div>' +
+    '</div>';
+  }
+  return '<button class="reward-color-btn" data-color="' + colorObj.id + '" style="text-align:center; padding:8px; background:#1e293b; border-radius:8px; border:2px solid ' + (isSelected ? '#d946ef' : 'transparent') + '; cursor:pointer;">' +
+    '<div style="width:24px; height:24px; border-radius:50%; background:' + swatchBg + '; margin:0 auto 4px auto;"></div>' +
+    '<div style="font-size:10px; color:#cbd5e1;">' + escapeHtml(colorObj.name) + '</div>' +
+  '</button>';
+}
+
+async function saveRewards() {
+  if (!state.profile) return;
+  state.profile.face = state.rewardSelection.face;
+  state.profile.color = state.rewardSelection.color;
+  await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  $('rewards-save-msg').textContent = '保存しました！';
+  setTimeout(function() { $('rewards-save-msg').textContent = ''; }, 1800);
+}
+
 /* ---------- 管理者 ---------- */
 async function submitAdminPassword() {
   var val = $('input-adminpw').value;
@@ -1042,6 +1225,7 @@ function wireUpEvents() {
   $('btn-battle-start').onclick = goPlayPasswordGate;
   $('btn-show-ranking').onclick = goRanking;
   $('btn-show-titles').onclick = goTitles;
+  $('btn-show-rewards').onclick = goRewards;
   $('btn-admin-login').onclick = goAdminLogin;
 
   $('btn-playpw-submit').onclick = submitPlayPassword;
@@ -1076,6 +1260,9 @@ function wireUpEvents() {
 
   $('btn-titles-save').onclick = saveTitles;
   $('btn-titles-back').onclick = goHome;
+
+  $('btn-rewards-save').onclick = saveRewards;
+  $('btn-rewards-back').onclick = goHome;
 
   $('btn-adminlogin-submit').onclick = submitAdminPassword;
   $('btn-adminlogin-back').onclick = goHome;
