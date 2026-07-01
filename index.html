@@ -224,10 +224,21 @@ async function dbSet(key, value, shared) {
   } catch (e) { console.error("dbSet error:", key, e); return false; }
 }
 
+// 管理者専用ドキュメント(vocab-words / play-password / student-ids)への書き込み。
+// Firestoreルール側で _adminAuth ハッシュの一致を要求しているため、
+// 通常の dbSet ではなくこちらを使う。
+async function dbSetAdmin(key, value, adminHash) {
+  try {
+    const ref = doc(db, "shared", keyToDocId(key));
+    await setDoc(ref, { value: JSON.stringify(value), _adminAuth: adminHash });
+    return true;
+  } catch (e) { console.error("dbSetAdmin error:", key, e); return false; }
+}
+
 signInAnonymously(auth).catch(e => console.error("Auth error:", e));
 
 // grab everything we need onto window so the non-module script below can use it
-window.__fb = { dbGet, dbSet };
+window.__fb = { dbGet, dbSet, dbSetAdmin };
 
 auth.onAuthStateChanged(function(user) {
   if (user) {
@@ -271,7 +282,7 @@ var DEFAULT_WORDS = [
   {english:'appropriate',japanese:'適切な',level:'卒業'},{english:'significant',japanese:'重要な',level:'卒業'}
 ];
 
-var ADMIN_PASSWORD = 'sensei123';
+var ADMIN_PASSWORD_HASH = '7d6fff6eec25cc5960ddc4e18101d02dad345db5eaf6210755826ef965450810';
 var DEFAULT_PLAY_PASSWORD = 'eigo123';
 var FACE_OPTIONS = ['🐶','🐱','🐻','🐼','🦊','🐸','🐵','🦁'];
 var LEVELS = ['中1','中2','中3','卒業'];
@@ -286,10 +297,39 @@ var state = {
   selectedLevel: null,
   setupFace: FACE_OPTIONS[0],
   game: null,
-  rankingLevel: '中1'
+  rankingLevel: '中1',
+  adminAuthHash: null
 };
 
 function $(id) { return document.getElementById(id); }
+
+async function sha256(str) {
+  var enc = new TextEncoder().encode(str);
+  var buf = await crypto.subtle.digest('SHA-256', enc);
+  var arr = Array.from(new Uint8Array(buf));
+  return arr.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+// Stage 3-1: 統計トラッキング基盤。
+// 旧プロフィール(stats未保持)にも後付けで初期化する。
+function ensureStats(profile) {
+  if (!profile.stats) {
+    profile.stats = {
+      totalScore: profile.totalScore || 0,
+      bestAccuracy: 0,
+      bestCombo: 0,
+      exactScoresSeen: [],
+      earlyBird: false,
+      nightOwl: false,
+      levelsPlayed: [],
+      comeback: false,
+      practiceCount: 0,
+      practiceCorrect: 0,
+      mistakesResolved: 0
+    };
+  }
+  return profile.stats;
+}
 
 function showScreen(id) {
   var screens = document.querySelectorAll('[id^="screen-"]');
@@ -438,6 +478,7 @@ async function submitStudentId() {
 
   var profile = await window.__fb.dbGet('profile-' + val, true);
   if (profile) {
+    ensureStats(profile);
     state.profile = profile;
     goLevelSelect();
   } else {
@@ -459,6 +500,7 @@ async function confirmProfileSetup() {
     face: state.setupFace,
     totalScore: 0
   };
+  ensureStats(profile);
   state.profile = profile;
   await window.__fb.dbSet('profile-' + state.studentId, profile, true);
   goLevelSelect();
@@ -503,6 +545,7 @@ function beginGame() {
     attempted: 0,
     combo: 0,
     maxCombo: 0,
+    hadMistake: false,
     timeLeft: 60,
     timerId: null
   };
@@ -569,6 +612,7 @@ function submitGameAnswer() {
     box.style.background = '#052e1a';
   } else {
     g.combo = 0;
+    g.hadMistake = true;
     box.style.background = '#450a0a';
   }
 
@@ -631,7 +675,22 @@ async function endGame() {
   await window.__fb.dbSet('rankings', state.rankings, true);
 
   if (state.profile) {
+    var stats = ensureStats(state.profile);
+    var now = new Date();
+    var hour = now.getHours();
+
+    stats.bestAccuracy = Math.max(stats.bestAccuracy, accuracy);
+    stats.bestCombo = Math.max(stats.bestCombo, g.maxCombo);
+    if (g.score === 777 && stats.exactScoresSeen.indexOf(777) === -1) {
+      stats.exactScoresSeen.push(777);
+    }
+    if (hour >= 6 && hour < 8) stats.earlyBird = true;
+    if (hour >= 23) stats.nightOwl = true;
+    if (stats.levelsPlayed.indexOf(level) === -1) stats.levelsPlayed.push(level);
+    if (g.hadMistake && g.maxCombo >= 20) stats.comeback = true;
+
     state.profile.totalScore = (state.profile.totalScore || 0) + g.score;
+    stats.totalScore = state.profile.totalScore;
     await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
   }
 
@@ -678,9 +737,11 @@ function escapeHtml(str) {
 }
 
 /* ---------- 管理者 ---------- */
-function submitAdminPassword() {
+async function submitAdminPassword() {
   var val = $('input-adminpw').value;
-  if (val === ADMIN_PASSWORD) {
+  var hash = await sha256(val);
+  if (hash === ADMIN_PASSWORD_HASH) {
+    state.adminAuthHash = hash;
     goAdminPanel();
   } else {
     $('error-adminpw').textContent = 'パスワードが正しくありません';
@@ -720,7 +781,7 @@ async function addWord() {
   var level = $('admin-level-select').value;
   if (!eng || !jpn) return;
   state.allWords.push({ english: eng, japanese: jpn, level: level });
-  await window.__fb.dbSet('vocab-words', state.allWords, true);
+  await window.__fb.dbSetAdmin('vocab-words', state.allWords, state.adminAuthHash);
   $('admin-word-en').value = '';
   $('admin-word-jp').value = '';
   renderAdminWordList();
@@ -730,7 +791,7 @@ async function deleteWord(eng, level) {
   state.allWords = state.allWords.filter(function(w) {
     return !(w.english === eng && w.level === level);
   });
-  await window.__fb.dbSet('vocab-words', state.allWords, true);
+  await window.__fb.dbSetAdmin('vocab-words', state.allWords, state.adminAuthHash);
   renderAdminWordList();
 }
 
@@ -754,7 +815,7 @@ async function issueStudentIds() {
     newIds.push(id);
     state.studentIds.push(id);
   }
-  await window.__fb.dbSet('student-ids', state.studentIds, true);
+  await window.__fb.dbSetAdmin('student-ids', state.studentIds, state.adminAuthHash);
   $('admin-issued-list').innerHTML = '<strong>発行したID:</strong><br>' + newIds.join('<br>');
 }
 
@@ -762,7 +823,7 @@ async function saveAdminPlayPassword() {
   var pw = $('admin-playpw-input').value.trim();
   if (!pw) return;
   state.playPassword = pw;
-  await window.__fb.dbSet('play-password', pw, true);
+  await window.__fb.dbSetAdmin('play-password', pw, state.adminAuthHash);
   $('admin-playpw-input').value = '';
   var msg = $('admin-save-msg');
   msg.textContent = '保存しました！';
