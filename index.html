@@ -475,7 +475,7 @@ let app = {
 };
 
 // 初期化
-await new Promise(resolve => {
+new Promise(resolve => {
   const checkReady = () => {
     if (window.firebaseReady) { app.init(); resolve(); }
     else setTimeout(checkReady, 100);
