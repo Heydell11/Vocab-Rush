@@ -50,6 +50,7 @@
   <div id="screen-home" class="card hidden">
     <h2 class="center" style="margin-top:0;">ホーム</h2>
     <button class="btn btn-primary" id="btn-battle-start">バトル開始</button>
+    <button class="btn btn-dark" id="btn-show-practice">🎯 練習モード</button>
     <button class="btn btn-dark" id="btn-show-ranking">ランキング</button>
     <button class="btn btn-dark" id="btn-show-titles">🏅 称号</button>
     <button class="btn btn-dark" id="btn-show-rewards">🎁 リワード</button>
@@ -105,7 +106,8 @@
 
   <!-- GAME -->
   <div id="screen-game" class="card hidden">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <p id="game-practice-label" class="center hidden" style="color:#fbbf24; font-size:12px; font-weight:bold; margin:0 0 8px 0;">🎯 練習モード(スコア・ランクには反映されません)</p>
+    <div id="game-hud-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
       <div style="font-weight:900; font-size:20px;">⏱ <span id="game-time">60</span>s</div>
       <div style="font-weight:900; font-size:20px; color:#22d3ee;"><span id="game-score">0</span> PTS</div>
     </div>
@@ -193,6 +195,38 @@
     <p style="font-size:12px; color:#94a3b8;">間違えた単語が自動で記録されます。覚えたら「克服」をタップしてください。</p>
     <div id="mistakes-list" style="max-height:400px; overflow-y:auto;"></div>
     <button class="btn btn-dark" id="btn-mistakes-back" style="margin-top:16px;">戻る</button>
+  </div>
+
+  <!-- PRACTICE SELECT -->
+  <div id="screen-practice-select" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🎯 練習モード</h2>
+    <p class="center" style="font-size:12px; color:#94a3b8;">スコア・ランクには反映されません</p>
+    <button class="btn btn-primary" id="btn-practice-bylevel">レベル別練習</button>
+    <button class="btn btn-primary" id="btn-practice-mistakes">苦手単語練習</button>
+    <button class="btn btn-dark" id="btn-practice-select-back" style="margin-top:16px;">戻る</button>
+  </div>
+
+  <!-- PRACTICE LEVEL SELECT -->
+  <div id="screen-practice-levelselect" class="card hidden">
+    <h2 class="center">練習するレベルを選択</h2>
+    <button class="btn btn-primary practice-level-btn" data-level="中1">中学1年</button>
+    <button class="btn btn-primary practice-level-btn" data-level="中2">中学2年</button>
+    <button class="btn btn-primary practice-level-btn" data-level="中3">中学3年</button>
+    <button class="btn btn-primary practice-level-btn" data-level="卒業">卒業レベル</button>
+    <button class="btn btn-dark" id="btn-practice-levelselect-back" style="margin-top:16px;">戻る</button>
+  </div>
+
+  <!-- PRACTICE RESULT -->
+  <div id="screen-practice-result" class="card hidden">
+    <h2 class="center" style="margin-top:0;">練習結果</h2>
+    <div class="center" style="background:linear-gradient(135deg,#0f766e,#155e75); border-radius:12px; padding:20px; margin:16px 0;">
+      <p id="practice-result-correct" style="font-size:40px; font-weight:900; margin:0;">0</p>
+      <p style="font-size:11px; color:#cbd5e1; text-transform:uppercase; letter-spacing:2px;">正解数</p>
+    </div>
+    <p class="center" style="font-size:13px; color:#94a3b8;">試行: <span id="practice-result-attempted">0</span></p>
+    <div id="practice-result-new-titles"></div>
+    <button class="btn btn-primary" id="btn-practice-result-again" style="margin-top:16px;">もう一度</button>
+    <button class="btn btn-dark" id="btn-practice-result-home">ホームへ</button>
   </div>
 
   <!-- ADMIN LOGIN -->
@@ -349,7 +383,9 @@ var state = {
   game: null,
   rankingLevel: '中1',
   adminAuthHash: null,
-  titleSelection: []
+  titleSelection: [],
+  practiceMode: false,
+  practiceType: null
 };
 
 function $(id) { return document.getElementById(id); }
@@ -436,9 +472,9 @@ var TITLES = [
   { id:'allLevels', name:'全レベル制覇', category:'特殊', desc:'全4レベルをプレイ', implemented:true, check:function(p){ return p.stats.levelsPlayed.length >= 4; } },
   { id:'comebackSpirit', name:'カムバック魂', category:'特殊', desc:'不正解後コンボ20以上に再到達', implemented:true, check:function(p){ return p.stats.comeback === true; } },
   // 特殊系(練習モード・苦手単語トラッキング実装後に有効化)
-  { id:'doryokuka', name:'努力家', category:'特殊', desc:'練習モード10回(未実装)', implemented:false, check:function(){ return false; } },
-  { id:'tanren', name:'鍛錬の達人', category:'特殊', desc:'練習モード50回(未実装)', implemented:false, check:function(){ return false; } },
-  { id:'jakutenKokufuku', name:'弱点克服者', category:'特殊', desc:'練習で累計100問正解(未実装)', implemented:false, check:function(){ return false; } },
+  { id:'doryokuka', name:'努力家', category:'特殊', desc:'練習モード10回', implemented:true, check:function(p){ return p.stats.practiceCount >= 10; } },
+  { id:'tanren', name:'鍛錬の達人', category:'特殊', desc:'練習モード50回', implemented:true, check:function(p){ return p.stats.practiceCount >= 50; } },
+  { id:'jakutenKokufuku', name:'弱点克服者', category:'特殊', desc:'練習で累計100問正解', implemented:true, check:function(p){ return p.stats.practiceCorrect >= 100; } },
   { id:'revenger', name:'リベンジャー', category:'特殊', desc:'苦手単語20個克服', implemented:true, check:function(p){ return p.stats.mistakesResolved >= 20; } },
   // 連続系(プレイ連続日数。ログインのみでは加算されず、ゲーム完走時にのみカウント)
   { id:'streak3', name:'三日坊主クリア', category:'連続', desc:'3日連続プレイ', implemented:true, check:function(p){ return p.streakDays >= 3; } },
@@ -642,8 +678,9 @@ function mergeMistakesIntoProfile(profile, sessionMistakes) {
       profile.mistakes[idx].missedCount += 1;
       profile.mistakes[idx].lastDate = now;
       profile.mistakes[idx].resolved = false;
+      profile.mistakes[idx].practicedCorrect = false;
     } else {
-      profile.mistakes.push({ english: m.english, japanese: m.japanese, level: m.level, missedCount: 1, lastDate: now, resolved: false });
+      profile.mistakes.push({ english: m.english, japanese: m.japanese, level: m.level, missedCount: 1, lastDate: now, resolved: false, practicedCorrect: false });
     }
   });
 }
@@ -847,7 +884,13 @@ async function confirmProfileSetup() {
 
 /* ---------- ゲームロジック ---------- */
 function startGameForLevel(level) {
+  state.practiceMode = false;
+  state.practiceType = null;
   state.selectedLevel = level;
+  runCountdownThen(beginGame);
+}
+
+function runCountdownThen(fn) {
   var countdown = 3;
   $('countdown-num').textContent = countdown;
   showScreen('screen-countdown');
@@ -855,7 +898,7 @@ function startGameForLevel(level) {
     countdown -= 1;
     if (countdown <= 0) {
       clearInterval(timer);
-      beginGame();
+      fn();
     } else {
       $('countdown-num').textContent = countdown;
     }
@@ -872,8 +915,15 @@ function shuffleArray(arr) {
 }
 
 function beginGame() {
-  var pool = state.allWords.filter(function(w) { return w.level === state.selectedLevel; });
-  if (pool.length === 0) pool = DEFAULT_WORDS.filter(function(w) { return w.level === state.selectedLevel; });
+  var pool;
+  if (state.practiceMode && state.practiceType === 'mistakes') {
+    pool = (state.profile.mistakes || [])
+      .filter(function(m) { return !m.resolved; })
+      .map(function(m) { return { english: m.english, japanese: m.japanese, level: m.level }; });
+  } else {
+    pool = state.allWords.filter(function(w) { return w.level === state.selectedLevel; });
+    if (pool.length === 0) pool = DEFAULT_WORDS.filter(function(w) { return w.level === state.selectedLevel; });
+  }
   var shuffled = shuffleArray(pool);
 
   state.game = {
@@ -886,20 +936,25 @@ function beginGame() {
     maxCombo: 0,
     hadMistake: false,
     mistakes: [],
+    correctWords: [],
     timeLeft: 60,
     timerId: null
   };
 
   $('game-score').textContent = '0';
-  $('game-time').textContent = '60';
+  $('game-time').textContent = state.practiceMode ? '∞' : '60';
   $('game-correct').textContent = '0';
   $('game-attempted').textContent = '0';
   $('game-input').value = '';
+  $('game-practice-label').classList.toggle('hidden', !state.practiceMode);
+  $('game-hud-row').style.display = state.practiceMode ? 'none' : 'flex';
   showCurrentWord();
   showScreen('screen-game');
   $('game-input').focus();
 
-  state.game.timerId = setInterval(gameTick, 1000);
+  if (!state.practiceMode) {
+    state.game.timerId = setInterval(gameTick, 1000);
+  }
 }
 
 function showCurrentWord() {
@@ -944,16 +999,19 @@ function submitGameAnswer() {
   var box = $('game-word-box');
   if (correct) {
     g.combo += 1;
-    var mult = getComboMultiplier(g.combo);
-    var pts = Math.round(10 * mult);
-    g.score += pts;
+    if (!state.practiceMode) {
+      var mult = getComboMultiplier(g.combo);
+      var pts = Math.round(10 * mult);
+      g.score += pts;
+    }
     g.correct += 1;
     g.maxCombo = Math.max(g.maxCombo, g.combo);
+    g.correctWords.push({ english: word.english, level: word.level || state.selectedLevel });
     box.style.background = '#052e1a';
   } else {
     g.combo = 0;
     g.hadMistake = true;
-    g.mistakes.push({ english: word.english, japanese: word.japanese, level: state.selectedLevel });
+    g.mistakes.push({ english: word.english, japanese: word.japanese, level: word.level || state.selectedLevel });
     box.style.background = '#450a0a';
   }
 
@@ -977,6 +1035,68 @@ function abandonGame() {
   if (state.game && state.game.timerId) clearInterval(state.game.timerId);
   state.game = null;
   goHome();
+}
+
+// 練習モードの終了処理。スコア・ランキングには一切反映しない。
+// practiceCount/practiceCorrect の統計のみ更新し、称号・リワード判定を行う。
+async function endPracticeSession() {
+  var g = state.game;
+  if (!g) { goHome(); return; }
+  if (g.timerId) clearInterval(g.timerId);
+
+  var newlyEarnedTitles = [];
+  if (state.profile) {
+    var stats = ensureStats(state.profile);
+    stats.practiceCount = (stats.practiceCount || 0) + 1;
+    stats.practiceCorrect = (stats.practiceCorrect || 0) + g.correct;
+
+    // 苦手単語練習で正解した単語には「正解済」の目印を付ける(削除はしない)。
+    // 本当に克服したかどうかの最終判定は、引き続き本番プレイでのみ行う。
+    if (state.practiceType === 'mistakes' && state.profile.mistakes) {
+      g.correctWords.forEach(function(cw) {
+        for (var i = 0; i < state.profile.mistakes.length; i++) {
+          var m = state.profile.mistakes[i];
+          if (m.english === cw.english && m.level === cw.level && !m.resolved) {
+            m.practicedCorrect = true;
+          }
+        }
+      });
+    }
+
+    newlyEarnedTitles = updateEarnedTitles(state.profile);
+    updateUnlockedRewards(state.profile);
+    await window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  }
+
+  $('practice-result-correct').textContent = g.correct;
+  $('practice-result-attempted').textContent = g.attempted;
+  renderResultNewTitles(newlyEarnedTitles, 'practice-result-new-titles');
+
+  state.game = null;
+  showScreen('screen-practice-result');
+}
+
+/* ---------- Stage 3-6: 練習モード 画面ロジック ---------- */
+function goPracticeSelect() {
+  if (!state.profile) { goHome(); return; }
+  var pool = (state.profile.mistakes || []).filter(function(m) { return !m.resolved; });
+  var btn = $('btn-practice-mistakes');
+  btn.textContent = pool.length > 0 ? ('苦手単語練習(' + pool.length + '語)') : '苦手単語練習(苦手単語がありません)';
+  btn.disabled = pool.length === 0;
+  showScreen('screen-practice-select');
+}
+
+function goPracticeLevelSelect() {
+  showScreen('screen-practice-levelselect');
+}
+
+function startPracticeMistakesFlow() {
+  var pool = (state.profile.mistakes || []).filter(function(m) { return !m.resolved; });
+  if (pool.length === 0) return;
+  state.practiceMode = true;
+  state.practiceType = 'mistakes';
+  state.selectedLevel = null;
+  runCountdownThen(beginGame);
 }
 
 async function endGame() {
@@ -1092,8 +1212,8 @@ function escapeHtml(str) {
 }
 
 /* ---------- Stage 3-2: 称号システム 画面ロジック ---------- */
-function renderResultNewTitles(newlyEarnedTitles) {
-  var box = $('result-new-titles');
+function renderResultNewTitles(newlyEarnedTitles, targetId) {
+  var box = $(targetId || 'result-new-titles');
   if (!box) return;
   if (!newlyEarnedTitles || newlyEarnedTitles.length === 0) {
     box.innerHTML = '';
@@ -1336,10 +1456,14 @@ function renderMistakesList() {
   indexed.forEach(function(entry) {
     var m = entry.m;
     var dateStr = m.lastDate ? new Date(m.lastDate).toLocaleDateString('ja-JP') : '';
+    var practicedBadge = m.practicedCorrect
+      ? '<span style="color:#34d399; font-weight:bold; font-size:11px;">✅ 練習で正解済</span>'
+      : '<span style="color:#94a3b8; font-size:11px;">未練習/未正解</span>';
     html += '<div class="ranking-item">' +
       '<div style="flex:1;">' +
         '<div style="font-weight:bold;">' + escapeHtml(m.english) + ' - ' + escapeHtml(m.japanese) + '</div>' +
         '<div style="font-size:11px; color:#94a3b8;">' + escapeHtml(m.level) + '　間違い' + m.missedCount + '回　最終:' + dateStr + '</div>' +
+        '<div style="margin-top:2px;">' + practicedBadge + '</div>' +
       '</div>' +
       '<button class="mistake-resolve-btn" data-idx="' + entry.idx + '" style="background:#22c55e; border:none; color:white; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;">克服</button>' +
     '</div>';
@@ -1463,6 +1587,7 @@ async function saveAdminPlayPassword() {
 /* ---------- イベントリスナー登録 ---------- */
 function wireUpEvents() {
   $('btn-battle-start').onclick = goPlayPasswordGate;
+  $('btn-show-practice').onclick = goPracticeSelect;
   $('btn-show-ranking').onclick = goRanking;
   $('btn-show-titles').onclick = goTitles;
   $('btn-show-rewards').onclick = goRewards;
@@ -1486,9 +1611,27 @@ function wireUpEvents() {
   });
   $('btn-levelselect-back').onclick = goHome;
 
+  $('btn-practice-select-back').onclick = goHome;
+  $('btn-practice-bylevel').onclick = goPracticeLevelSelect;
+  $('btn-practice-mistakes').onclick = startPracticeMistakesFlow;
+  $('btn-practice-levelselect-back').onclick = goPracticeSelect;
+  var practiceLevelBtns = document.querySelectorAll('.practice-level-btn');
+  practiceLevelBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      state.practiceMode = true;
+      state.practiceType = 'level';
+      state.selectedLevel = btn.getAttribute('data-level');
+      runCountdownThen(beginGame);
+    };
+  });
+  $('btn-practice-result-again').onclick = function() { runCountdownThen(beginGame); };
+  $('btn-practice-result-home').onclick = goHome;
+
   $('btn-game-submit').onclick = submitGameAnswer;
   $('game-input').onkeydown = function(e) { if (e.key === 'Enter') submitGameAnswer(); };
-  $('btn-game-abandon').onclick = abandonGame;
+  $('btn-game-abandon').onclick = function() {
+    if (state.practiceMode) { endPracticeSession(); } else { abandonGame(); }
+  };
 
   $('btn-result-retry').onclick = goLevelSelect;
   $('btn-result-ranking').onclick = goRanking;
