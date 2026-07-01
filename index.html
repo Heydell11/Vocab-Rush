@@ -53,6 +53,7 @@
     <button class="btn btn-dark" id="btn-show-ranking">ランキング</button>
     <button class="btn btn-dark" id="btn-show-titles">🏅 称号</button>
     <button class="btn btn-dark" id="btn-show-rewards">🎁 リワード</button>
+    <button class="btn btn-dark" id="btn-show-rank">🎖 ランク</button>
     <button class="btn btn-dark" id="btn-admin-login">管理者</button>
   </div>
 
@@ -169,6 +170,20 @@
     <p class="center" id="rewards-save-msg" style="color:#34d399; font-size:13px; min-height:18px; margin-top:12px;"></p>
     <button class="btn btn-primary" id="btn-rewards-save">保存</button>
     <button class="btn btn-dark" id="btn-rewards-back">戻る</button>
+  </div>
+
+  <!-- RANK -->
+  <div id="screen-rank" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🎖 ランク</h2>
+    <div class="center" style="background:linear-gradient(135deg,#4c1d95,#155e75); border-radius:12px; padding:20px; margin-bottom:16px;">
+      <p style="font-size:11px; color:#cbd5e1; text-transform:uppercase; letter-spacing:2px; margin:0;">今月のランク</p>
+      <p id="rank-current-name" style="font-size:28px; font-weight:900; margin:6px 0;"></p>
+      <p id="rank-current-points" style="font-size:13px; color:#94a3b8; margin:0;"></p>
+    </div>
+    <p style="font-size:12px; color:#94a3b8;">歴代最高到達ランク(月ごとの達成回数): </p>
+    <p id="rank-confirmed-name" style="font-size:16px;"></p>
+    <div id="rank-tier-list" style="margin-top:12px;"></div>
+    <button class="btn btn-dark" id="btn-rank-back" style="margin-top:16px;">戻る</button>
   </div>
 
   <!-- ADMIN LOGIN -->
@@ -366,6 +381,12 @@ function ensureStats(profile) {
   if (!profile.color) profile.color = 'blue';
   if (!profile.unlockedRewardFaces) profile.unlockedRewardFaces = [];
   if (!profile.unlockedRewardColors) profile.unlockedRewardColors = [];
+  if (typeof profile.weeklyRankPoints !== 'number') profile.weeklyRankPoints = 0;
+  if (!profile.weekKey) profile.weekKey = null;
+  if (!profile.monthKeyForRank) profile.monthKeyForRank = null;
+  if (!profile.bestRankKeyThisMonth) profile.bestRankKeyThisMonth = null;
+  if (!profile.rankAchievementCounts) profile.rankAchievementCounts = {};
+  if (!profile.displayedRankKey) profile.displayedRankKey = null;
   return profile.stats;
 }
 
@@ -511,6 +532,88 @@ function findTitleName(titleId) {
     if (TITLES[i].id === titleId) return TITLES[i].name;
   }
   return titleId;
+}
+
+/* ---------- Stage 3-4: ランクシステム(週別リセット+月次確定) ---------- */
+// 注: 元仕様書は「7段階」と書かれていましたが、実際に列挙されていたのは8段階でした
+// (リワード/称号の数の誤記と同じパターン)。実データ(8段階)を正として実装します。
+var RANK_TIERS = [
+  { id:'beginner', name:'ビギナー', threshold:0, emoji:'🔰' },
+  { id:'copper', name:'コッパー', threshold:100, emoji:'🟤' },
+  { id:'bronze', name:'ブロンズ', threshold:300, emoji:'🥉' },
+  { id:'silver', name:'シルバー', threshold:600, emoji:'🥈' },
+  { id:'gold', name:'ゴールド', threshold:1000, emoji:'🥇' },
+  { id:'platinum', name:'プラチナ', threshold:1500, emoji:'⚪' },
+  { id:'diamond', name:'ダイヤ', threshold:2200, emoji:'💎' },
+  { id:'master', name:'マスター', threshold:3200, emoji:'👑' }
+];
+
+function getRankForPoints(points) {
+  var result = RANK_TIERS[0];
+  for (var i = 0; i < RANK_TIERS.length; i++) {
+    if (points >= RANK_TIERS[i].threshold) result = RANK_TIERS[i];
+  }
+  return result;
+}
+
+function rankIndexOf(id) {
+  for (var i = 0; i < RANK_TIERS.length; i++) {
+    if (RANK_TIERS[i].id === id) return i;
+  }
+  return 0;
+}
+
+function getRankById(id) {
+  for (var i = 0; i < RANK_TIERS.length; i++) {
+    if (RANK_TIERS[i].id === id) return RANK_TIERS[i];
+  }
+  return RANK_TIERS[0];
+}
+
+// ISO 8601 週番号(月曜始まり)を "YYYY-Www" 形式で返す
+function getWeekKey(d) {
+  var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  var weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return date.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+}
+
+// ゲーム完走時(endGame)にのみ呼び出す。
+// - 週が変わっていたら weeklyRankPoints をリセット
+// - 月が変わっていたら、前月の最高到達ランク(bestRankKeyThisMonth)を
+//   rankAchievementCounts に加算し、今月分は0(ビギナー)から再スタートする
+function updateRank(profile, sessionScore) {
+  var now = new Date();
+  var wk = getWeekKey(now);
+  var mk = getMonthKey();
+
+  if (profile.weekKey !== wk) {
+    profile.weeklyRankPoints = 0;
+    profile.weekKey = wk;
+  }
+  profile.weeklyRankPoints += sessionScore;
+
+  if (profile.monthKeyForRank !== mk) {
+    if (profile.monthKeyForRank && profile.bestRankKeyThisMonth) {
+      if (!profile.rankAchievementCounts) profile.rankAchievementCounts = {};
+      var prevTier = profile.bestRankKeyThisMonth;
+      profile.rankAchievementCounts[prevTier] = (profile.rankAchievementCounts[prevTier] || 0) + 1;
+    }
+    profile.monthKeyForRank = mk;
+    profile.bestRankKeyThisMonth = null; // 新シーズン、0から再スタート
+  }
+
+  var currentRank = getRankForPoints(profile.weeklyRankPoints);
+  var currentIdx = rankIndexOf(currentRank.id);
+  var bestIdx = profile.bestRankKeyThisMonth ? rankIndexOf(profile.bestRankKeyThisMonth) : -1;
+  if (currentIdx > bestIdx) {
+    profile.bestRankKeyThisMonth = currentRank.id;
+  }
+
+  // 表示用ランクは「今月の最高到達」。まだ何も無ければビギナー。
+  profile.displayedRankKey = profile.bestRankKeyThisMonth || 'beginner';
 }
 
 function showScreen(id) {
@@ -900,6 +1003,7 @@ async function endGame() {
     stats.totalScore = state.profile.totalScore;
 
     updatePlayStreak(state.profile);
+    updateRank(state.profile, g.score);
 
     var newlyEarnedTitles = updateEarnedTitles(state.profile);
     updateUnlockedRewards(state.profile);
@@ -1126,6 +1230,50 @@ async function saveRewards() {
   setTimeout(function() { $('rewards-save-msg').textContent = ''; }, 1800);
 }
 
+/* ---------- Stage 3-4: ランク画面ロジック ---------- */
+function goRank() {
+  if (!state.profile) { goHome(); return; }
+  ensureStats(state.profile);
+  showScreen('screen-rank');
+  renderRankScreen();
+}
+
+// 表示専用(副作用なし)。実際の週次リセット・月次確定処理は endGame の updateRank でのみ行う。
+function renderRankScreen() {
+  var wk = getWeekKey(new Date());
+  var weeklyPoints = (state.profile.weekKey === wk) ? (state.profile.weeklyRankPoints || 0) : 0;
+
+  // 今月の最高到達ランク(月が変わっていればビギナーから再スタート)
+  var mk = getMonthKey();
+  var monthRankId = (state.profile.monthKeyForRank === mk && state.profile.bestRankKeyThisMonth)
+    ? state.profile.bestRankKeyThisMonth
+    : 'beginner';
+  var monthRank = getRankById(monthRankId);
+
+  $('rank-current-name').textContent = monthRank.emoji + ' ' + monthRank.name;
+  $('rank-current-points').textContent = '今週の獲得: ' + weeklyPoints + ' pt';
+
+  var counts = state.profile.rankAchievementCounts || {};
+  var historyHtml = '';
+  RANK_TIERS.forEach(function(r) {
+    if (counts[r.id]) {
+      historyHtml += '<span style="display:inline-block; margin:0 8px 4px 0;">' + r.emoji + '(' + counts[r.id] + ')</span>';
+    }
+  });
+  $('rank-confirmed-name').innerHTML = historyHtml || '<span style="color:#94a3b8; font-weight:normal;">まだありません(月が変わると記録されます)</span>';
+
+  var currentIdx = rankIndexOf(monthRankId);
+  var html = '';
+  RANK_TIERS.forEach(function(r, i) {
+    var achieved = i <= currentIdx;
+    html += '<div class="ranking-item" style="' + (achieved ? '' : 'opacity:0.4;') + '">' +
+      '<span>' + r.emoji + ' ' + escapeHtml(r.name) + '</span>' +
+      '<span style="font-size:11px; color:#94a3b8;">' + r.threshold + 'pt〜</span>' +
+    '</div>';
+  });
+  $('rank-tier-list').innerHTML = html;
+}
+
 /* ---------- 管理者 ---------- */
 async function submitAdminPassword() {
   var val = $('input-adminpw').value;
@@ -1226,6 +1374,7 @@ function wireUpEvents() {
   $('btn-show-ranking').onclick = goRanking;
   $('btn-show-titles').onclick = goTitles;
   $('btn-show-rewards').onclick = goRewards;
+  $('btn-show-rank').onclick = goRank;
   $('btn-admin-login').onclick = goAdminLogin;
 
   $('btn-playpw-submit').onclick = submitPlayPassword;
@@ -1263,6 +1412,8 @@ function wireUpEvents() {
 
   $('btn-rewards-save').onclick = saveRewards;
   $('btn-rewards-back').onclick = goHome;
+
+  $('btn-rank-back').onclick = goHome;
 
   $('btn-adminlogin-submit').onclick = submitAdminPassword;
   $('btn-adminlogin-back').onclick = goHome;
