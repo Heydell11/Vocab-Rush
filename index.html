@@ -49,14 +49,14 @@
   <!-- HOME -->
   <div id="screen-home" class="card hidden">
     <h2 class="center" style="margin-top:0;">ホーム</h2>
-    <button class="btn btn-primary" id="btn-battle-start">バトル開始</button>
-    <button class="btn btn-dark" id="btn-show-practice">🎯 練習モード</button>
+    <button class="btn btn-primary" id="btn-battle-start">ログイン</button>
     <button class="btn btn-dark" id="btn-show-ranking">ランキング</button>
-    <button class="btn btn-dark" id="btn-show-titles">🏅 称号</button>
-    <button class="btn btn-dark" id="btn-show-rewards">🎁 リワード</button>
-    <button class="btn btn-dark" id="btn-show-rank">🎖 ランク</button>
-    <button class="btn btn-dark" id="btn-show-mistakes">📝 苦手単語</button>
-    <button class="btn btn-dark" id="btn-admin-login">管理者</button>
+    <button class="btn btn-dark hidden" id="btn-show-practice">🎯 練習モード</button>
+    <button class="btn btn-dark hidden" id="btn-show-titles">🏅 称号</button>
+    <button class="btn btn-dark hidden" id="btn-show-rewards">🎁 リワード</button>
+    <button class="btn btn-dark hidden" id="btn-show-rank">🎖 ランク</button>
+    <button class="btn btn-dark hidden" id="btn-show-mistakes">📝 苦手単語</button>
+    <p class="center" id="btn-admin-login" style="margin-top:28px; font-size:11px; color:#475569; cursor:pointer; user-select:none;">管理者</p>
   </div>
 
   <!-- PLAY PASSWORD -->
@@ -589,7 +589,7 @@ var RANK_TIERS = [
   { id:'bronze', name:'ブロンズ', threshold:300, emoji:'🥉' },
   { id:'silver', name:'シルバー', threshold:600, emoji:'🥈' },
   { id:'gold', name:'ゴールド', threshold:1000, emoji:'🥇' },
-  { id:'platinum', name:'プラチナ', threshold:1500, emoji:'⚪' },
+  { id:'platinum', name:'プラチナ', threshold:1500, emoji:'💠' },
   { id:'diamond', name:'ダイヤ', threshold:2200, emoji:'💎' },
   { id:'master', name:'マスター', threshold:3200, emoji:'👑' }
 ];
@@ -747,7 +747,7 @@ async function initApp() {
   populateYearSelects();
   populateFaceOptions();
   populateAdminLevelSelect();
-  showScreen('screen-home');
+  goHome();
 }
 
 function populateYearSelects() {
@@ -797,7 +797,26 @@ function populateAdminLevelSelect() {
 }
 
 /* ---------- 画面遷移 ---------- */
-function goHome() { showScreen('screen-home'); }
+function goHome() {
+  renderHomeScreen();
+  showScreen('screen-home');
+}
+
+// ログイン前は「ログイン」「ランキング」のみ、ログイン後はバトル開始・練習モード等を表示する
+function renderHomeScreen() {
+  var loggedIn = !!state.profile;
+  var battleBtn = $('btn-battle-start');
+  if (loggedIn) {
+    battleBtn.textContent = 'バトル開始';
+    battleBtn.onclick = goLevelSelect;
+  } else {
+    battleBtn.textContent = 'ログイン';
+    battleBtn.onclick = goPlayPasswordGate;
+  }
+  ['btn-show-practice', 'btn-show-titles', 'btn-show-rewards', 'btn-show-rank', 'btn-show-mistakes'].forEach(function(id) {
+    $(id).classList.toggle('hidden', !loggedIn);
+  });
+}
 
 function goPlayPasswordGate() {
   $('input-playpw').value = '';
@@ -856,7 +875,7 @@ async function submitStudentId() {
   if (profile) {
     ensureStats(profile);
     state.profile = profile;
-    goLevelSelect();
+    goHome();
   } else {
     $('profilesetup-id').textContent = 'ID: ' + val;
     state.setupFace = FACE_OPTIONS[0];
@@ -879,7 +898,7 @@ async function confirmProfileSetup() {
   ensureStats(profile);
   state.profile = profile;
   await window.__fb.dbSet('profile-' + state.studentId, profile, true);
-  goLevelSelect();
+  goHome();
 }
 
 /* ---------- ゲームロジック ---------- */
@@ -1586,7 +1605,6 @@ async function saveAdminPlayPassword() {
 
 /* ---------- イベントリスナー登録 ---------- */
 function wireUpEvents() {
-  $('btn-battle-start').onclick = goPlayPasswordGate;
   $('btn-show-practice').onclick = goPracticeSelect;
   $('btn-show-ranking').onclick = goRanking;
   $('btn-show-titles').onclick = goTitles;
