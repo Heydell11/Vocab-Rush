@@ -305,6 +305,15 @@
     <button class="btn btn-primary" id="btn-admin-issue-qa">QA用IDを発行</button>
     <div id="admin-qa-list" style="background:#0f172a; border-radius:8px; padding:8px; max-height:200px; overflow-y:auto; font-size:13px; margin-top:8px;"></div>
 
+    <h3>生徒データ管理</h3>
+    <p style="font-size:12px; color:#94a3b8;">生徒自身が登録した入学年度(プロフィール内の情報)を基準に絞り込みます。読み込みにはプロフィール1件ごとに通信が発生するため、ボタンを押した時のみ取得します。</p>
+    <button class="btn btn-dark" id="btn-admin-load-students">生徒一覧を読み込む</button>
+    <select id="admin-student-year-filter" style="display:none;"></select>
+    <button class="btn btn-primary" id="btn-admin-delete-year" style="display:none; background:#dc2626;">選択条件を一括削除</button>
+    <div id="admin-student-list" style="max-height:300px; overflow-y:auto; background:#0f172a; border-radius:8px; padding:8px; margin-top:8px;">
+      <p style="color:#94a3b8; text-align:center; margin:0; font-size:13px;">「生徒一覧を読み込む」を押してください</p>
+    </div>
+
     <button class="btn btn-dark" id="btn-adminpanel-home" style="margin-top:20px;">ホームへ</button>
   </div>
 
@@ -438,7 +447,8 @@ var state = {
   practiceType: null,
   maintenance: { enabled: false, startTime: null, endTime: null, message: '' },
   announcements: [],
-  qaStudentIds: []
+  qaStudentIds: [],
+  adminStudentList: []
 };
 
 function $(id) { return document.getElementById(id); }
@@ -954,6 +964,10 @@ function goAdminPanel() {
   renderAdminMaintenanceForm();
   renderAdminAnnouncementList();
   renderAdminQaList();
+  state.adminStudentList = [];
+  $('admin-student-year-filter').style.display = 'none';
+  $('btn-admin-delete-year').style.display = 'none';
+  $('admin-student-list').innerHTML = '<p style="color:#94a3b8; text-align:center; margin:0; font-size:13px;">「生徒一覧を読み込む」を押してください</p>';
   showScreen('screen-adminpanel');
 }
 
@@ -1904,6 +1918,113 @@ async function issueQaId() {
   renderAdminQaList();
 }
 
+/* ---------- Stage 3-8: 生徒データ管理(管理者) ---------- */
+// プロフィール1件ごとに読み取りが発生するため、明示的なボタン操作でのみ実行する
+async function loadStudentDataList() {
+  var listEl = $('admin-student-list');
+  listEl.innerHTML = '<p style="color:#94a3b8; text-align:center; margin:0; font-size:13px;">読み込み中...(' + state.studentIds.length + '件)</p>';
+
+  var results = [];
+  for (var i = 0; i < state.studentIds.length; i++) {
+    var id = state.studentIds[i];
+    var profile = await window.__fb.dbGet('profile-' + id, true);
+    results.push({ id: id, profile: profile });
+  }
+  state.adminStudentList = results;
+
+  $('admin-student-year-filter').style.display = '';
+  $('btn-admin-delete-year').style.display = '';
+  renderAdminStudentYearFilter();
+  renderAdminStudentList('all');
+}
+
+function renderAdminStudentYearFilter() {
+  var years = {};
+  state.adminStudentList.forEach(function(r) {
+    if (r.profile && r.profile.enrollYear) years[r.profile.enrollYear] = true;
+  });
+  var yearList = Object.keys(years).sort();
+
+  var sel = $('admin-student-year-filter');
+  var html = '<option value="all">全件(' + state.adminStudentList.length + '名)</option>';
+  yearList.forEach(function(y) {
+    var count = state.adminStudentList.filter(function(r) { return r.profile && String(r.profile.enrollYear) === y; }).length;
+    html += '<option value="' + y + '">' + y + '年度入学(' + count + '名)</option>';
+  });
+  var unregisteredCount = state.adminStudentList.filter(function(r) { return !r.profile; }).length;
+  html += '<option value="unregistered">未登録ID(' + unregisteredCount + '件)</option>';
+  sel.innerHTML = html;
+  sel.onchange = function() { renderAdminStudentList(sel.value); };
+}
+
+function renderAdminStudentList(filter) {
+  var list = state.adminStudentList || [];
+  var filtered = list.filter(function(r) {
+    if (filter === 'all') return true;
+    if (filter === 'unregistered') return !r.profile;
+    return r.profile && String(r.profile.enrollYear) === filter;
+  });
+
+  var listEl = $('admin-student-list');
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<p style="color:#94a3b8; text-align:center; margin:0; font-size:13px;">該当する生徒がいません</p>';
+    return;
+  }
+  var html = '';
+  filtered.forEach(function(r) {
+    var label = r.profile
+      ? (escapeHtml(r.profile.name) + '(' + r.profile.enrollYear + '年度・累計' + (r.profile.totalScore || 0) + 'pt)')
+      : '<span style="color:#94a3b8;">(プロフィール未登録)</span>';
+    html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #334155; font-size:12px;">' +
+      '<span><span style="font-family:monospace;">' + escapeHtml(r.id) + '</span> ' + label + '</span>' +
+      '<button class="admin-student-delete-btn" data-id="' + escapeHtml(r.id) + '" style="background:none; border:none; color:#f87171; cursor:pointer; font-size:12px; white-space:nowrap;">削除</button>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+
+  var delBtns = listEl.querySelectorAll('.admin-student-delete-btn');
+  delBtns.forEach(function(btn) {
+    btn.onclick = function() { deleteStudentCompletely(btn.getAttribute('data-id')); };
+  });
+}
+
+// 生徒IDとプロフィールの両方を完全に削除する(元に戻せない)
+async function deleteStudentCompletely(id) {
+  if (!confirm('生徒ID「' + id + '」を完全に削除します(IDとプロフィールの両方)。元に戻せません。よろしいですか？')) return;
+  state.studentIds = state.studentIds.filter(function(x) { return x !== id; });
+  await window.__fb.dbSetAdmin('student-ids', state.studentIds, state.adminAuthHash);
+  await window.__fb.dbDelete('profile-' + id, true);
+  state.adminStudentList = (state.adminStudentList || []).filter(function(r) { return r.id !== id; });
+  renderAdminStudentYearFilter();
+  renderAdminStudentList($('admin-student-year-filter').value);
+}
+
+// 現在選択中の絞り込み条件(年度 or 未登録)に該当する生徒を一括削除する
+async function deleteYearBulk() {
+  var filter = $('admin-student-year-filter').value;
+  if (filter === 'all') {
+    alert('全件の一括削除はできません。年度、または「未登録ID」を指定してください。');
+    return;
+  }
+  var targets = (state.adminStudentList || []).filter(function(r) {
+    if (filter === 'unregistered') return !r.profile;
+    return r.profile && String(r.profile.enrollYear) === filter;
+  });
+  if (targets.length === 0) return;
+  if (!confirm(targets.length + '名の生徒データを完全に削除します。元に戻せません。本当によろしいですか？')) return;
+
+  var idsToRemove = {};
+  for (var i = 0; i < targets.length; i++) {
+    idsToRemove[targets[i].id] = true;
+    await window.__fb.dbDelete('profile-' + targets[i].id, true);
+  }
+  state.studentIds = state.studentIds.filter(function(x) { return !idsToRemove[x]; });
+  await window.__fb.dbSetAdmin('student-ids', state.studentIds, state.adminAuthHash);
+  state.adminStudentList = (state.adminStudentList || []).filter(function(r) { return !idsToRemove[r.id]; });
+  renderAdminStudentYearFilter();
+  renderAdminStudentList('all');
+}
+
 /* ---------- イベントリスナー登録 ---------- */
 function wireUpEvents() {
   $('btn-show-practice').onclick = goPracticeSelect;
@@ -1986,6 +2107,8 @@ function wireUpEvents() {
   $('btn-admin-save-maintenance').onclick = saveAdminMaintenance;
   $('btn-admin-post-announcement').onclick = postAnnouncement;
   $('btn-admin-issue-qa').onclick = issueQaId;
+  $('btn-admin-load-students').onclick = loadStudentDataList;
+  $('btn-admin-delete-year').onclick = deleteYearBulk;
   $('btn-adminpanel-home').onclick = goHome;
 }
 
