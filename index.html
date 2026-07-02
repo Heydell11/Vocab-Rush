@@ -51,6 +51,7 @@
     <h2 class="center" style="margin-top:0;">ホーム</h2>
     <button class="btn btn-primary" id="btn-battle-start">ログイン</button>
     <button class="btn btn-dark" id="btn-show-ranking">ランキング</button>
+    <button class="btn btn-dark" id="btn-show-announcements">🔔 お知らせ</button>
     <button class="btn btn-dark hidden" id="btn-show-practice">🎯 練習モード</button>
     <button class="btn btn-dark hidden" id="btn-show-titles">🏅 称号</button>
     <button class="btn btn-dark hidden" id="btn-show-rewards">🎁 リワード</button>
@@ -229,6 +230,20 @@
     <button class="btn btn-dark" id="btn-practice-result-home">ホームへ</button>
   </div>
 
+  <!-- MAINTENANCE -->
+  <div id="screen-maintenance" class="card hidden center">
+    <h2 style="margin-top:0;">🛠 メンテナンス中</h2>
+    <p id="maintenance-message" style="color:#94a3b8; white-space:pre-wrap;"></p>
+    <p id="btn-admin-login-maintenance" style="margin-top:28px; font-size:11px; color:#475569; cursor:pointer; user-select:none;">管理者</p>
+  </div>
+
+  <!-- ANNOUNCEMENTS -->
+  <div id="screen-announcements" class="card hidden">
+    <h2 class="center" style="margin-top:0;">🔔 お知らせ</h2>
+    <div id="announcements-list" style="max-height:400px; overflow-y:auto;"></div>
+    <button class="btn btn-dark" id="btn-announcements-back" style="margin-top:16px;">戻る</button>
+  </div>
+
   <!-- ADMIN LOGIN -->
   <div id="screen-adminlogin" class="card hidden">
     <h2>管理者ログイン</h2>
@@ -264,6 +279,32 @@
     <button class="btn btn-primary" id="btn-admin-save-playpw">保存</button>
     <p class="center" id="admin-save-msg" style="color:#34d399; font-size:13px;"></p>
 
+    <h3>メンテナンスモード</h3>
+    <div style="display:flex; align-items:center; gap:8px; margin:8px 0;">
+      <input type="checkbox" id="admin-maintenance-enabled" style="width:auto; margin:0;">
+      <label for="admin-maintenance-enabled" style="font-size:13px;">メンテナンスモードを有効にする</label>
+    </div>
+    <label style="font-size:12px; color:#94a3b8;">開始時刻</label>
+    <input type="datetime-local" id="admin-maintenance-start">
+    <label style="font-size:12px; color:#94a3b8;">終了時刻</label>
+    <input type="datetime-local" id="admin-maintenance-end">
+    <label style="font-size:12px; color:#94a3b8;">生徒への表示メッセージ</label>
+    <textarea id="admin-maintenance-message" rows="3" placeholder="例: 2/1 深夜1時〜3時はメンテナンスのためお休みです" style="width:100%; padding:12px; margin:8px 0; background:#0f172a; border:1px solid #475569; border-radius:8px; color:white; font-family:inherit;"></textarea>
+    <button class="btn btn-primary" id="btn-admin-save-maintenance">メンテナンス設定を保存</button>
+    <p class="center" id="admin-maintenance-save-msg" style="color:#34d399; font-size:13px;"></p>
+
+    <h3>お知らせ</h3>
+    <input type="text" id="admin-announcement-title" placeholder="タイトル">
+    <textarea id="admin-announcement-body" rows="3" placeholder="本文" style="width:100%; padding:12px; margin:8px 0; background:#0f172a; border:1px solid #475569; border-radius:8px; color:white; font-family:inherit;"></textarea>
+    <button class="btn btn-primary" id="btn-admin-post-announcement">お知らせを投稿</button>
+    <div id="admin-announcement-list" style="max-height:200px; overflow-y:auto; background:#0f172a; border-radius:8px; padding:8px; margin-top:8px;"></div>
+
+    <h3>QAアカウント管理</h3>
+    <p style="font-size:12px; color:#94a3b8;">QA用IDは通常のプレイと同じ流れで称号・リワード・ランクを実際に獲得します。動作確認テスト用のIDです。混同を避けるため、生徒には配布しないでください。</p>
+    <p style="font-size:12px; color:#94a3b8;">「全解放」で称号・リワード・ランクを即座に全て付与、「進捗リセット」でプロフィールを削除してまっさらな状態からやり直せます。</p>
+    <button class="btn btn-primary" id="btn-admin-issue-qa">QA用IDを発行</button>
+    <div id="admin-qa-list" style="background:#0f172a; border-radius:8px; padding:8px; max-height:200px; overflow-y:auto; font-size:13px; margin-top:8px;"></div>
+
     <button class="btn btn-dark" id="btn-adminpanel-home" style="margin-top:20px;">ホームへ</button>
   </div>
 
@@ -271,7 +312,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -319,10 +360,19 @@ async function dbSetAdmin(key, value, adminHash) {
   } catch (e) { console.error("dbSetAdmin error:", key, e); return false; }
 }
 
+async function dbDelete(key, shared) {
+  try {
+    const col = shared ? "shared" : "personal";
+    const ref = doc(db, col, keyToDocId(key));
+    await deleteDoc(ref);
+    return true;
+  } catch (e) { console.error("dbDelete error:", key, e); return false; }
+}
+
 signInAnonymously(auth).catch(e => console.error("Auth error:", e));
 
 // grab everything we need onto window so the non-module script below can use it
-window.__fb = { dbGet, dbSet, dbSetAdmin };
+window.__fb = { dbGet, dbSet, dbSetAdmin, dbDelete };
 
 auth.onAuthStateChanged(function(user) {
   if (user) {
@@ -385,7 +435,10 @@ var state = {
   adminAuthHash: null,
   titleSelection: [],
   practiceMode: false,
-  practiceType: null
+  practiceType: null,
+  maintenance: { enabled: false, startTime: null, endTime: null, message: '' },
+  announcements: [],
+  qaStudentIds: []
 };
 
 function $(id) { return document.getElementById(id); }
@@ -739,6 +792,15 @@ async function loadAllData() {
 
   var ranks = await window.__fb.dbGet('rankings', true);
   if (ranks) state.rankings = ranks;
+
+  var maint = await window.__fb.dbGet('maintenance', true);
+  if (maint) state.maintenance = maint;
+
+  var ann = await window.__fb.dbGet('announcements', true);
+  if (ann && Array.isArray(ann)) state.announcements = ann;
+
+  var qaIds = await window.__fb.dbGet('qa-student-ids', true);
+  if (qaIds && Array.isArray(qaIds)) state.qaStudentIds = qaIds;
 }
 
 /* ---------- 初期化 ---------- */
@@ -797,12 +859,45 @@ function populateAdminLevelSelect() {
 }
 
 /* ---------- 画面遷移 ---------- */
+// メンテナンス期間内かどうかを判定(開始/終了時刻はdatetime-local文字列)
+function isMaintenanceActive() {
+  var m = state.maintenance;
+  if (!m || !m.enabled) return false;
+  var now = new Date();
+  if (m.startTime) {
+    var s = new Date(m.startTime);
+    if (now < s) return false;
+  }
+  if (m.endTime) {
+    var e = new Date(m.endTime);
+    if (now > e) return false;
+  }
+  return true;
+}
+
+function findQaEntry(id) {
+  for (var i = 0; i < state.qaStudentIds.length; i++) {
+    if (state.qaStudentIds[i].id === id) return state.qaStudentIds[i];
+  }
+  return null;
+}
+function isQAStudentId(id) { return !!findQaEntry(id); }
+function isHiddenFromRanking(id) {
+  var e = findQaEntry(id);
+  return e ? !!e.hiddenFromRanking : false;
+}
+
 function goHome() {
+  if (isMaintenanceActive()) {
+    $('maintenance-message').textContent = state.maintenance.message || 'ただいまメンテナンス中です。しばらくお待ちください。';
+    showScreen('screen-maintenance');
+    return;
+  }
   renderHomeScreen();
   showScreen('screen-home');
 }
 
-// ログイン前は「ログイン」「ランキング」のみ、ログイン後はバトル開始・練習モード等を表示する
+// ログイン前は「ログイン」「ランキング」「お知らせ」のみ、ログイン後はバトル開始・練習モード等を表示する
 function renderHomeScreen() {
   var loggedIn = !!state.profile;
   var battleBtn = $('btn-battle-start');
@@ -816,6 +911,14 @@ function renderHomeScreen() {
   ['btn-show-practice', 'btn-show-titles', 'btn-show-rewards', 'btn-show-rank', 'btn-show-mistakes'].forEach(function(id) {
     $(id).classList.toggle('hidden', !loggedIn);
   });
+
+  var annBtn = $('btn-show-announcements');
+  var hasUnread = false;
+  if (state.announcements && state.announcements.length > 0 && state.profile) {
+    var latest = state.announcements[0].date;
+    hasUnread = !state.profile.lastSeenAnnouncementDate || new Date(latest) > new Date(state.profile.lastSeenAnnouncementDate);
+  }
+  annBtn.textContent = hasUnread ? '🔔 お知らせ ●' : '🔔 お知らせ';
 }
 
 function goPlayPasswordGate() {
@@ -848,6 +951,9 @@ function goAdminLogin() {
 
 function goAdminPanel() {
   populateAdminLevelSelect();
+  renderAdminMaintenanceForm();
+  renderAdminAnnouncementList();
+  renderAdminQaList();
   showScreen('screen-adminpanel');
 }
 
@@ -874,6 +980,7 @@ async function submitStudentId() {
   var profile = await window.__fb.dbGet('profile-' + val, true);
   if (profile) {
     ensureStats(profile);
+    profile.isQA = isQAStudentId(val);
     state.profile = profile;
     goHome();
   } else {
@@ -893,7 +1000,8 @@ async function confirmProfileSetup() {
     name: name,
     enrollYear: year,
     face: state.setupFace,
-    totalScore: 0
+    totalScore: 0,
+    isQA: isQAStudentId(state.studentId)
   };
   ensureStats(profile);
   state.profile = profile;
@@ -1128,31 +1236,33 @@ async function endGame() {
   $('result-combo').textContent = g.maxCombo;
   $('result-accuracy').textContent = accuracy + '%';
 
-  // ランキング保存
+  // ランキング保存(QAアカウント等、ランキング非表示指定のIDは除外)
   var level = state.selectedLevel;
   var mk = getMonthKey();
-  if (!state.rankings[level]) state.rankings[level] = { monthly: [], monthKey: mk };
-  if (state.rankings[level].monthKey !== mk) {
-    state.rankings[level].monthly = [];
-    state.rankings[level].monthKey = mk;
-  }
-  var entry = {
-    studentId: state.studentId,
-    name: state.profile ? state.profile.name : state.studentId,
-    score: g.score,
-    correct: g.correct,
-    attempted: g.attempted,
-    accuracy: accuracy,
-    maxCombo: g.maxCombo,
-    date: new Date().toISOString()
-  };
-  state.rankings[level].monthly = state.rankings[level].monthly
-    .filter(function(e) { return e.studentId !== entry.studentId; })
-    .concat(entry)
-    .sort(function(a, b) { return b.score - a.score; })
-    .slice(0, 20);
+  if (!isHiddenFromRanking(state.studentId)) {
+    if (!state.rankings[level]) state.rankings[level] = { monthly: [], monthKey: mk };
+    if (state.rankings[level].monthKey !== mk) {
+      state.rankings[level].monthly = [];
+      state.rankings[level].monthKey = mk;
+    }
+    var entry = {
+      studentId: state.studentId,
+      name: state.profile ? state.profile.name : state.studentId,
+      score: g.score,
+      correct: g.correct,
+      attempted: g.attempted,
+      accuracy: accuracy,
+      maxCombo: g.maxCombo,
+      date: new Date().toISOString()
+    };
+    state.rankings[level].monthly = state.rankings[level].monthly
+      .filter(function(e) { return e.studentId !== entry.studentId; })
+      .concat(entry)
+      .sort(function(a, b) { return b.score - a.score; })
+      .slice(0, 20);
 
-  await window.__fb.dbSet('rankings', state.rankings, true);
+    await window.__fb.dbSet('rankings', state.rankings, true);
+  }
 
   if (state.profile) {
     var stats = ensureStats(state.profile);
@@ -1449,6 +1559,36 @@ function renderRankScreen() {
 }
 
 /* ---------- Stage 3-5: 苦手単語トラッキング 画面ロジック ---------- */
+/* ---------- Stage 3-7: お知らせ(生徒向け) ---------- */
+function goAnnouncements() {
+  showScreen('screen-announcements');
+  renderAnnouncementsList();
+  if (state.profile) {
+    state.profile.lastSeenAnnouncementDate = new Date().toISOString();
+    window.__fb.dbSet('profile-' + state.studentId, state.profile, true);
+  }
+}
+
+function renderAnnouncementsList() {
+  var listEl = $('announcements-list');
+  if (!state.announcements || state.announcements.length === 0) {
+    listEl.innerHTML = '<p style="text-align:center; color:#94a3b8;">お知らせはまだありません</p>';
+    return;
+  }
+  var html = '';
+  state.announcements.forEach(function(a) {
+    var dateStr = a.date ? new Date(a.date).toLocaleDateString('ja-JP') : '';
+    html += '<div style="background:#0f172a; border-radius:8px; padding:12px; margin-bottom:8px;">' +
+      '<div style="display:flex; justify-content:space-between; gap:8px;">' +
+        '<span style="font-weight:bold;">' + escapeHtml(a.title) + '</span>' +
+        '<span style="font-size:11px; color:#94a3b8; white-space:nowrap;">' + dateStr + '</span>' +
+      '</div>' +
+      '<p style="font-size:13px; color:#cbd5e1; margin:6px 0 0 0; white-space:pre-wrap;">' + escapeHtml(a.body) + '</p>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
 function goMistakes() {
   if (!state.profile) { goHome(); return; }
   ensureStats(state.profile);
@@ -1603,6 +1743,167 @@ async function saveAdminPlayPassword() {
   setTimeout(function() { msg.textContent = ''; }, 2000);
 }
 
+/* ---------- Stage 3-7: メンテナンスモード(管理者) ---------- */
+function renderAdminMaintenanceForm() {
+  var m = state.maintenance || {};
+  $('admin-maintenance-enabled').checked = !!m.enabled;
+  $('admin-maintenance-start').value = m.startTime || '';
+  $('admin-maintenance-end').value = m.endTime || '';
+  $('admin-maintenance-message').value = m.message || '';
+}
+
+async function saveAdminMaintenance() {
+  state.maintenance = {
+    enabled: $('admin-maintenance-enabled').checked,
+    startTime: $('admin-maintenance-start').value || null,
+    endTime: $('admin-maintenance-end').value || null,
+    message: $('admin-maintenance-message').value.trim()
+  };
+  await window.__fb.dbSetAdmin('maintenance', state.maintenance, state.adminAuthHash);
+  var msg = $('admin-maintenance-save-msg');
+  msg.textContent = '保存しました！';
+  setTimeout(function() { msg.textContent = ''; }, 2000);
+}
+
+/* ---------- Stage 3-7: お知らせ(管理者) ---------- */
+function renderAdminAnnouncementList() {
+  var listEl = $('admin-announcement-list');
+  if (!state.announcements || state.announcements.length === 0) {
+    listEl.innerHTML = '<p style="color:#94a3b8; text-align:center; margin:0;">お知らせはまだありません</p>';
+    return;
+  }
+  var html = '';
+  state.announcements.forEach(function(a, i) {
+    var dateStr = a.date ? new Date(a.date).toLocaleDateString('ja-JP') : '';
+    html += '<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #334155;">' +
+      '<span>' + escapeHtml(a.title) + '<span style="color:#94a3b8; font-size:11px;">(' + dateStr + ')</span></span>' +
+      '<button class="admin-delete-announcement-btn" data-idx="' + i + '" style="background:none; border:none; color:#f87171; cursor:pointer; font-size:13px;">削除</button>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+
+  var delBtns = listEl.querySelectorAll('.admin-delete-announcement-btn');
+  delBtns.forEach(function(btn) {
+    btn.onclick = function() {
+      var idx = parseInt(btn.getAttribute('data-idx'), 10);
+      deleteAnnouncement(idx);
+    };
+  });
+}
+
+async function postAnnouncement() {
+  var title = $('admin-announcement-title').value.trim();
+  var body = $('admin-announcement-body').value.trim();
+  if (!title || !body) return;
+  state.announcements.unshift({ title: title, body: body, date: new Date().toISOString() });
+  state.announcements = state.announcements.slice(0, 30); // 最大30件を保持
+  await window.__fb.dbSetAdmin('announcements', state.announcements, state.adminAuthHash);
+  $('admin-announcement-title').value = '';
+  $('admin-announcement-body').value = '';
+  renderAdminAnnouncementList();
+}
+
+async function deleteAnnouncement(idx) {
+  state.announcements.splice(idx, 1);
+  await window.__fb.dbSetAdmin('announcements', state.announcements, state.adminAuthHash);
+  renderAdminAnnouncementList();
+}
+
+/* ---------- Stage 3-7: QAアカウント管理(管理者) ---------- */
+function renderAdminQaList() {
+  var listEl = $('admin-qa-list');
+  if (!state.qaStudentIds || state.qaStudentIds.length === 0) {
+    listEl.innerHTML = '<p style="color:#94a3b8; text-align:center; margin:0;">QA用IDはまだありません</p>';
+    return;
+  }
+  var html = '';
+  state.qaStudentIds.forEach(function(q) {
+    html += '<div style="padding:8px 0; border-bottom:1px solid #334155; font-family:monospace;">' +
+      '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+        '<span>' + escapeHtml(q.id) + '</span>' +
+        '<label style="display:flex; align-items:center; gap:4px; font-family:inherit; font-size:11px; color:#94a3b8;">' +
+          '<input type="checkbox" class="admin-qa-hidden-toggle" data-id="' + escapeHtml(q.id) + '" style="width:auto; margin:0;" ' + (q.hiddenFromRanking ? 'checked' : '') + '>' +
+          'ランキング非表示' +
+        '</label>' +
+      '</div>' +
+      '<div style="display:flex; gap:8px; margin-top:6px; font-family:inherit;">' +
+        '<button class="admin-qa-grant-btn" data-id="' + escapeHtml(q.id) + '" style="flex:1; background:#7c3aed; border:none; color:white; padding:6px; border-radius:6px; font-size:11px; cursor:pointer;">🎁 全解放</button>' +
+        '<button class="admin-qa-reset-btn" data-id="' + escapeHtml(q.id) + '" style="flex:1; background:#334155; border:none; color:#f87171; padding:6px; border-radius:6px; font-size:11px; cursor:pointer;">🔄 進捗リセット</button>' +
+      '</div>' +
+      '<p class="admin-qa-status" data-id="' + escapeHtml(q.id) + '" style="font-size:11px; color:#34d399; margin:4px 0 0 0; min-height:14px; font-family:inherit;"></p>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+
+  var toggles = listEl.querySelectorAll('.admin-qa-hidden-toggle');
+  toggles.forEach(function(cb) {
+    cb.onchange = function() {
+      var id = cb.getAttribute('data-id');
+      var entry = findQaEntry(id);
+      if (entry) {
+        entry.hiddenFromRanking = cb.checked;
+        window.__fb.dbSetAdmin('qa-student-ids', state.qaStudentIds, state.adminAuthHash);
+      }
+    };
+  });
+
+  var grantBtns = listEl.querySelectorAll('.admin-qa-grant-btn');
+  grantBtns.forEach(function(btn) {
+    btn.onclick = function() { grantAllToQa(btn.getAttribute('data-id')); };
+  });
+
+  var resetBtns = listEl.querySelectorAll('.admin-qa-reset-btn');
+  resetBtns.forEach(function(btn) {
+    btn.onclick = function() { resetQaProgress(btn.getAttribute('data-id')); };
+  });
+}
+
+function showQaStatus(id, text) {
+  var el = document.querySelector('.admin-qa-status[data-id="' + id + '"]');
+  if (!el) return;
+  el.textContent = text;
+  setTimeout(function() { el.textContent = ''; }, 2500);
+}
+
+// そのQA IDの「本物のプロフィールデータ」に、称号・リワード・ランクを直接書き込む。
+// 表示だけの上書きではないため、他の画面のロジックには一切手を加えていない。
+async function grantAllToQa(id) {
+  var profile = await window.__fb.dbGet('profile-' + id, true);
+  if (!profile) {
+    showQaStatus(id, 'まだプロフィールがありません(先に生徒側で1回ログインしてください)');
+    return;
+  }
+  ensureStats(profile);
+  profile.earnedTitleKeys = TITLES.filter(function(t) { return t.implemented; }).map(function(t) { return t.id; });
+  profile.unlockedRewardFaces = REWARD_FACES.map(function(r) { return r.emoji; });
+  profile.unlockedRewardColors = REWARD_COLORS.map(function(r) { return r.id; });
+  profile.bestRankKeyThisMonth = RANK_TIERS[RANK_TIERS.length - 1].id;
+  profile.monthKeyForRank = getMonthKey();
+  profile.displayedRankKey = profile.bestRankKeyThisMonth;
+  var counts = {};
+  RANK_TIERS.forEach(function(r) { counts[r.id] = 1; });
+  profile.rankAchievementCounts = counts;
+  await window.__fb.dbSet('profile-' + id, profile, true);
+  showQaStatus(id, '全て解放しました！');
+}
+
+// そのQA IDのプロフィールを削除する。次回ログイン時に新規プロフィール作成からやり直せる。
+async function resetQaProgress(id) {
+  if (!confirm('QA ID「' + id + '」のプロフィールを削除します。次回ログイン時に新規作成からやり直しになります。よろしいですか？')) return;
+  await window.__fb.dbDelete('profile-' + id, true);
+  showQaStatus(id, '進捗をリセットしました');
+}
+
+async function issueQaId() {
+  var id = generateRandomId();
+  while (state.studentIds.indexOf(id) !== -1) { id = generateRandomId(); }
+  state.studentIds.push(id);
+  state.qaStudentIds.push({ id: id, hiddenFromRanking: true });
+  await window.__fb.dbSetAdmin('student-ids', state.studentIds, state.adminAuthHash);
+  await window.__fb.dbSetAdmin('qa-student-ids', state.qaStudentIds, state.adminAuthHash);
+  renderAdminQaList();
+}
+
 /* ---------- イベントリスナー登録 ---------- */
 function wireUpEvents() {
   $('btn-show-practice').onclick = goPracticeSelect;
@@ -1671,6 +1972,10 @@ function wireUpEvents() {
 
   $('btn-mistakes-back').onclick = goHome;
 
+  $('btn-show-announcements').onclick = goAnnouncements;
+  $('btn-announcements-back').onclick = goHome;
+  $('btn-admin-login-maintenance').onclick = goAdminLogin;
+
   $('btn-adminlogin-submit').onclick = submitAdminPassword;
   $('btn-adminlogin-back').onclick = goHome;
   $('input-adminpw').onkeydown = function(e) { if (e.key === 'Enter') submitAdminPassword(); };
@@ -1678,6 +1983,9 @@ function wireUpEvents() {
   $('btn-admin-add-word').onclick = addWord;
   $('btn-admin-issue-ids').onclick = issueStudentIds;
   $('btn-admin-save-playpw').onclick = saveAdminPlayPassword;
+  $('btn-admin-save-maintenance').onclick = saveAdminMaintenance;
+  $('btn-admin-post-announcement').onclick = postAnnouncement;
+  $('btn-admin-issue-qa').onclick = issueQaId;
   $('btn-adminpanel-home').onclick = goHome;
 }
 
